@@ -1,0 +1,212 @@
+---
+title: "Social Familiarity and Reinforcement Value"
+author: "Haoran (Matt) Wan"
+date: "today"
+format: 
+  html:
+    toc: true
+    code-fold: true
+    self-contained: true
+engine: knitr
+---
+
+## Introduction
+
+This document contains the R code to replicate the analyses for the research on social familiarity and reward value in rats. It showcases two distinct analytical approaches:
+
+1.  A **frequentist, individual-level analysis** using nonlinear least-squares (`nlsLM`) to fit the Zero-Bounded Exponential (ZBEn) demand model for each subject and condition, followed by linear contrast tests.
+2.  A **Bayesian multilevel analysis** using a custom nonlinear model implemented in `brms` to account for repeated measures and leverage the strengths of Bayesian inference for a small sample size.
+
+The data for this study is available in the Supplementary Material of the original publication, which can be accessed at the publisher's website: <https://www.frontiersin.org/articles/10.3389/fpsyg.2023.1158365/full#supplementary-material>.
+
+## 1. Setup: Load Packages and Process Data
+
+This chunk loads all necessary R packages for both analyses and processes the raw data, creating the dummy variables needed for the models.
+
+```{r setup_and_process}
+#| message: false
+#| warning: false
+
+# --- Load Packages ---
+library(minpack.lm) 
+library(multcomp)   
+library(brms)       
+library(tidybayes) 
+library(readr)
+library(dplyr)
+library(tidyr)
+
+# --- Helper Functions ---
+lhs <- function(x) {log10(0.5*x + sqrt(0.25*(x^2) + 1))}
+antilog <- function(y) {(10^(2*y)-1)/(10^y)}
+ev <- function(y) {1 / (100 * y)}
+
+# --- Load and Process Data ---
+raw_dat <- read_csv("Code/dat.csv")
+
+dat <- raw_dat |>
+  mutate(
+    active_ses_time = (active_ses_time / 60) / 60,
+    interact_rt = interact / active_ses_time,
+    lq = lhs(interact_rt),
+    fmlr = if_else(familiarity == 1, "Cagemate", "Non-cagemate"),
+    cond = case_when(
+      cond == "10sec" ~ "10 Sec",
+      cond == "30sec" ~ "30 Sec",
+      cond == "60sec" ~ "60 Sec"
+    )
+  ) |>
+  group_by(pair, fmlr, cond, fr) |>
+  summarise(across(c(interact_rt, lq), mean), .groups = 'drop') |>
+  mutate(id = group_indices(across(c(pair, fmlr, cond))))
+
+# Create dummy variables for models
+dat_processed <- dat |>
+  tidyr::unite("fmlr_cond", fmlr:cond, remove = FALSE) |>
+  fastDummies::dummy_cols(select_columns = c("fmlr", "fmlr_cond")) |>
+  select(-fmlr_cond) |>
+  rename(
+    "f" = "fmlr_Cagemate", "u" = "fmlr_Non-cagemate",
+    "f1" = "fmlr_cond_Cagemate_10 Sec", "f3" = "fmlr_cond_Cagemate_30 Sec", "f6" = "fmlr_cond_Cagemate_60 Sec",
+    "u1" = "fmlr_cond_Non-cagemate_10 Sec", "u3" = "fmlr_cond_Non-cagemate_30 Sec", "u6" = "fmlr_cond_Non-cagemate_60 Sec"
+  )
+```
+
+---
+
+## 2. Part 1: Frequentist Individual-Level Analysis
+
+This section fits the ZBEn demand model to each subject's data for each condition and then performs linear contrasts on the estimated parameters.
+
+```{r frequentist_analysis}
+#| cache: true
+#| tbl-cap: "Frequentist Model Parameters and Contrasts"
+
+# --- Fit ZBEn model for each subject (pair) ---
+param_list <- list()
+contrast_list <- list()
+
+for (subj_pair in 1:4) {
+  subj_data <- filter(dat_processed, pair == subj_pair)
+  
+  model_fit <- nlsLM(
+    lq ~ lhs(qf1*f1 + qf3*f3 + qf6*f6 + qu1*u1 + qu3*u3 + qu6*u6) * exp((-exp(af1*f1 + af3*f3 + af6*f6 + au1*u1 + au3*u3 + au6*u6) / 
+              lhs(qf1*f1 + qf3*f3 + qf6*f6 + qu1*u1 + qu3*u3 + qu6*u6)) * (qf1*f1 + qf3*f3 + qf6*f6 + qu1*u1 + qu3*u3 + qu6*u6) * fr),
+    data = subj_data,
+    start = list(af1=-6, af3=-6, af6=-6, au1=-6, au3=-6, au6=-6,
+                 qf1=50, qf3=50, qf6=50, qu1=50, qu3=50, qu6=50),
+    control = list(maxiter = 1024)
+  )
+  
+  params <- broom::tidy(model_fit)
+  params$pair <- subj_pair
+  param_list[[subj_pair]] <- params
+  
+  contrast_matrix <- matrix(c(
+    1,1,1,-1,-1,-1,0,0,0,0,0,0, # Familiarity effect on alpha
+    0,0,0,0,0,0,1,1,1,-1,-1,-1  # Familiarity effect on Q0
+  ), nrow = 2, byrow = TRUE)
+  # The rownames here will be used to create the 'parameter' column later
+  rownames(contrast_matrix) <- c("alpha", "Q0")
+  
+  contrasts <- broom::tidy(summary(glht(model_fit, linfct = contrast_matrix)))
+  contrasts$pair <- subj_pair
+  contrast_list[[subj_pair]] <- contrasts
+}
+
+# --- 1. Reformat the final_params DataFrame ---
+final_params <- bind_rows(param_list) |>
+  # Create new columns by parsing the 'term' column
+  mutate(
+    parameter = if_else(grepl("^a", term), "alpha", "Q0"),
+    Familiarity = if_else(grepl("f", term), "Cagemate", "Non-cagemate"),
+    `Social Duration` = case_when(
+      grepl("1$", term) ~ "10 Sec",
+      grepl("3$", term) ~ "30 Sec",
+      grepl("6$", term) ~ "60 Sec"
+    )
+  ) |>
+  relocate(pair, Familiarity, `Social Duration`, parameter) |>
+  select(-term) 
+
+# --- 2. Reformat the final_contrasts DataFrame ---
+final_contrasts <- bind_rows(contrast_list) |>
+  rename(parameter = contrast) |>
+  mutate(contrast = "Cagemate vs. Non-cagemate") |>
+  relocate(pair, parameter, contrast)
+
+
+# --- Display the reformatted results ---
+cat("--- Estimated ZBEn Parameters (Individual Level) ---\n")
+print(final_params, n=48)
+cat("\n--- Linear Contrast Results (p-values) ---\n")
+print(final_contrasts)
+```
+
+---
+
+## 3. Part 2: Bayesian Nonlinear Multilevel Analysis
+
+This section uses `brms` to fit a single nonlinear multilevel model to the entire dataset, accounting for the repeated-measures structure and the small sample size.
+
+```{r bayesian_analysis}
+#| cache: true
+#| results: 'hold'
+#| tbl-cap: "Bayesian Model Contrast Summaries"
+
+# --- Define the brms model formula ---
+# Parameters 'a' (alpha) and 'b' (Q0) are modeled hierarchically.
+brms_formula <- bf(
+  lq ~ log10(0.5*exp(b) + sqrt(0.25*(exp(b)^2) + 1)) * exp((-exp(a) / log10(0.5*exp(b) + sqrt(0.25*(exp(b)^2) + 1))) * exp(b) * fr),
+  a ~ 0 + f1 + f3 + f6 + u1 + u3 + u6 + (1 | pair),
+  b ~ 0 + f1 + f3 + f6 + u1 + u3 + u6 + (1 | pair),
+  nl = TRUE
+)
+
+# --- Define priors ---
+brms_priors <- c(
+  prior(cauchy(0, 2.5), class = "sigma"),
+  prior(cauchy(-6, 2.5), class = "b", nlpar = "a"),
+  prior(cauchy(0, 2.5), class = "sd", nlpar = "a"),
+  prior(cauchy(4, 2.5), class = "b", nlpar = "b"),
+  prior(cauchy(0, 2.5), class = "sd", nlpar = "b")
+)
+
+# --- Fit the Bayesian model ---
+brms_fit <- brm(
+  formula = brms_formula, data = dat_processed, prior = brms_priors,
+  iter = 4000, warmup = 2000, chains = 4, cores = 4,
+  backend = "cmdstanr", control = list(adapt_delta = 0.95, max_treedepth = 10),
+  silent = 2, refresh = 0
+)
+
+# --- Analyze Posterior for Alpha parameter ---
+cat("--- Posterior Summary for Contrasts on Alpha ---\n")
+alpha_summary <- brms_fit |>
+  spread_draws(`b_a_.*`, regex = TRUE) |>
+  mutate(
+    familiarity = (b_a_f1 + b_a_f3 + b_a_f6) - (b_a_u1 + b_a_u3 + b_a_u6),
+    duration_linear = ((-1)*b_a_f1 + 0*b_a_f3 + (1)*b_a_f6) + ((-1)*b_a_u1 + 0*b_a_u3 + (1)*b_a_u6)
+  ) |>
+  select(familiarity, duration_linear) |>
+  pivot_longer(everything(), names_to = "contrast", values_to = "value") |>
+  group_by(contrast) |>
+  median_qi()
+
+print(alpha_summary)
+
+# --- Analyze Posterior for Q0 parameter ---
+cat("\n--- Posterior Summary for Contrasts on Q0 ---\n")
+q0_summary <- brms_fit |>
+  spread_draws(`b_b_.*`, regex = TRUE) |>
+  mutate(
+    familiarity = (b_b_f1 + b_b_f3 + b_b_f6) - (b_b_u1 + b_b_u3 + b_b_u6),
+    duration_linear = ((-1)*b_b_f1 + 0*b_b_f3 + (1)*b_b_f6) + ((-1)*b_b_u1 + 0*b_b_u3 + (1)*b_b_u6)
+  ) |>
+  select(familiarity, duration_linear) |>
+  pivot_longer(everything(), names_to = "contrast", values_to = "value") |>
+  group_by(contrast) |>
+  median_qi()
+  
+print(q0_summary)
+```
