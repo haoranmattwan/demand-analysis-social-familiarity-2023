@@ -1,48 +1,49 @@
-# Social Familiarity and Reinforcement Value: A Behavioral-Economic Analysis
+# A Behavioral-Economic Demand Analysis of Social Reinforcement
+### An R and Python Replication of Schulingkamp et al. (2023), *Frontiers in Psychology*
 
-This repository contains the analysis scripts, figures, and presentation materials for the peer-reviewed publication:
+This repository contains the complete, reproducible analysis scripts for the peer-reviewed publication:
 
 > Schulingkamp, R., Wan, H., & Hackenberg, T. D. (2023). Social familiarity and reinforcement value: a behavioral-economic analysis of demand for social interaction with cagemate and non-cagemate female rats. *Frontiers in Psychology*, *14*, 1158365. https://doi.org/10.3389/fpsyg.2023.1158365
 
----
-
-## Project Overview
-
-This study investigates how social familiarity (cagemate vs. non-cagemate) and reinforcement duration (10s, 30s, 60s) affect the value of social interaction for rats. The core of the project is a behavioral-economic analysis where the price of social access was systematically increased to generate demand functions.
-
-A key feature of this repository is its dual-paradigm analytical approach. The data is analyzed using both:
-1.  A **frequentist approach**, with nonlinear models fit for each subject individually.
-2.  A **Bayesian multilevel approach**, which models all subjects simultaneously to better handle the small sample size and account for repeated measures.
-
-The data for this study is available in the Supplementary Material of the original publication, which can be accessed at the publisher's website: <https://www.frontiersin.org/articles/10.3389/fpsyg.2023.1158365/full#supplementary-material>.
-
-## Repository Structure
-
-The project materials are organized into the following folders:
-
-* **/Analysis**: Contains the primary analysis scripts.
-    * `analysis.qmd`: A Quarto document with the complete **R** code for both the frequentist (`minpack.lm`) and Bayesian (`brms`) analyses.
-    * `analysis.ipynb`: A Jupyter Notebook with the corresponding **Python** translation, replicating the analyses using `lmfit` (frequentist) and `PyMC` (Bayesian).
-
-* **/Figure**: Contains the figures as they appear in the final publication.
-
-* **/Presentation**: Includes a slide deck or poster used to present the findings of this research.
+The data for this study is available in the Supplementary Material of the original publication at the **[publisher's website](https://www.frontiersin.org/articles/10.3389/fpsyg.2023.1158365/full#supplementary-material)**.
 
 ---
 
-## Methodology Snapshot
+## Project Objective
 
-This project applies a modeling approach to quantify how rats value social interaction.
+The goal of this project is to apply a behavioral-economic demand analysis to quantify the reinforcing value of a non-tangible good (social interaction). The analysis demonstrates how to model consumption as a function of price and test how experimental manipulations (social familiarity and reinforcer magnitude) affect key economic parameters.
 
-* **Nonlinear Demand Modeling**: The core of both analyses is the **Zero-Bounded Exponential (ZBEn) model**, which describes consumption as a function of price.
-* **Frequentist Analysis**: Individual-level demand curves were fit for each of the 24 unique subject-condition combinations using nonlinear least-squares.
-* **Bayesian Multilevel Analysis**: A custom nonlinear hierarchical model was implemented in Stan (via `brms`) and `PyMC` to analyze the data, allowing for more robust parameter estimation given the sample size. Posterior distributions of contrasts were examined to determine the effects of familiarity and duration.
+A core feature of this repository is its demonstration of two distinct analytical frameworks for fitting a complex nonlinear model to a small-N, repeated-measures dataset:
+1.  A **frequentist, individual-level analysis** using nonlinear least-squares (`lmfit`).
+2.  A **Bayesian hierarchical analysis** using a custom nonlinear multilevel model (`PyMC`), which leverages partial pooling for more robust parameter estimation.
+
+## Repository Contents
+
+| File / Folder | Description |
+| :--- | :--- |
+| **`/Analysis/`** | Contains the primary scripts that replicate all findings in the paper. |
+| `analysis.qmd` | A Quarto document with the complete **R** workflow for both frequentist and Bayesian analyses. |
+| `analysis.ipynb` | A Jupyter Notebook providing a **Python** translation of the analyses. |
+| **`/Figure/`** | All figures as they appear in the final publication. |
+| **`/Presentation/`** | A slide deck used to present the research findings. |
 
 ---
 
-## Software and Execution
+## Methodological Approach
 
-To run the analyses, you will need the appropriate software environment for your chosen language.
+This project showcases a sophisticated computational modeling workflow for experimental data, highlighting the following skills:
+
+* **Nonlinear Demand Curve Modeling**: The core of both analyses is the application of the **Zero-Bounded Exponential (ZBEn) model**, a specialized function used to describe how consumption changes as a function of price. This involves custom model implementation in both R and Python.
+* **Dual Analytical Frameworks**:
+    * **Frequentist (Individual-Level) Analysis**: Demand models were fit for each subject individually using nonlinear least-squares. This approach allows for a direct assessment of between-subject variability and is common in the field.
+    * **Bayesian (Hierarchical) Analysis**: A custom nonlinear hierarchical model was implemented to analyze the entire dataset within a single framework. This approach is statistically powerful for small-N designs as it regularizes individual-level estimates and provides full posterior inference for all parameters and contrasts.
+* **Hypothesis Testing via Contrasts**: Hypotheses were tested by performing linear contrasts on the estimated model parameters ($\log(Q_0)$ and $\log(\alpha)$) in both the frequentist (manual calculation) and Bayesian (posterior distribution analysis) frameworks.
+
+---
+
+## How to Reproduce This Analysis
+
+First, download the supplementary data from the publisher's website and place it in the `/Analysis/` directory. Then, set up the appropriate software environment.
 
 ### R Environment (`/Analysis/analysis.qmd`)
 

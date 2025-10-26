@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Social Familiarity and Reinforcement Value</title>
+<title>A Behavioral-Economic Demand Analysis of Social Reinforcement</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -58,7 +58,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </style>
 
 
-<script src="analysis_Py_files/libs/clipboard/clipboard.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script><script src="analysis_Py_files/libs/clipboard/clipboard.min.js"></script>
 <script src="analysis_Py_files/libs/quarto-html/quarto.js" type="module"></script>
 <script src="analysis_Py_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
 <script src="analysis_Py_files/libs/quarto-html/popper.min.js"></script>
@@ -69,7 +69,39 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="analysis_Py_files/libs/bootstrap/bootstrap.min.js"></script>
 <link href="analysis_Py_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="analysis_Py_files/libs/bootstrap/bootstrap-81267100e462c21b3d6c0d5bf76a3417.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
 
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 </head>
 
@@ -81,7 +113,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Social Familiarity and Reinforcement Value</h1>
+<h1 class="title">A Behavioral-Economic Demand Analysis of Social Reinforcement</h1>
 </div>
 
 
@@ -98,294 +130,535 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>This notebook replicates the analyses for the research on social familiarity and reward value in rats. The original analyses were conducted in R, and this document translates them into a Python workflow.</p>
-<p>Two distinct analytical approaches are presented:</p>
+<section id="a-python-replication-of-schulingkamp-et-al.-2023-frontiers-in-psychology" class="level3">
+<h3 class="anchored" data-anchor-id="a-python-replication-of-schulingkamp-et-al.-2023-frontiers-in-psychology">A Python Replication of Schulingkamp et al.&nbsp;(2023), <em>Frontiers in Psychology</em></h3>
+<hr>
+</section>
+<section id="project-objective" class="level3">
+<h3 class="anchored" data-anchor-id="project-objective">Project Objective</h3>
+<p>This notebook provides a complete, reproducible Python workflow for the analyses presented in the following publication:</p>
+<blockquote class="blockquote">
+<p>Schulingkamp, R., Wan, H., &amp; Hackenberg, T. D. (2023). Social familiarity and reinforcement value: a behavioral-economic analysis of demand for social interaction with cagemate and non-cagemate female rats. <em>Frontiers in Psychology</em>, <em>14</em>, 1158365. https://doi.org/10.3389/fpsyg.2023.1158365</p>
+</blockquote>
+<p>The study’s goal is to quantify the reinforcing value of social interaction in rats using a behavioral-economic demand analysis. Specifically, it tests how this value is affected by <strong>social familiarity</strong> and <strong>reinforcer magnitude</strong> (duration).</p>
+<p>This notebook demonstrates two distinct analytical approaches to fitting the <strong>Zero-Bounded Exponential (ZBEn) demand model</strong> to the data: 1. A <strong>frequentist, individual-level analysis</strong> using <code>lmfit</code> for nonlinear least-squares. 2. A <strong>Bayesian multilevel analysis</strong> using <code>pymc</code> to account for the repeated-measures data structure from a small sample.</p>
+<p>The data for this study is available in the Supplementary Material of the original publication at the <a href="https://www.frontiersin.org/articles/10.3389/fpsyg.2023.1158365/full#supplementary-material">publisher’s website</a>.</p>
+</section>
+<section id="analysis-workflow" class="level3">
+<h3 class="anchored" data-anchor-id="analysis-workflow">Analysis Workflow</h3>
 <ol type="1">
-<li>A <strong>frequentist, individual-level analysis</strong> using <code>lmfit</code> to fit the Zero-Bounded Exponential (ZBEn) demand model for each subject and condition.</li>
-<li>A <strong>Bayesian multilevel analysis</strong> using <code>PyMC</code> to fit a custom nonlinear model, accounting for the repeated-measures data structure.</li>
+<li><strong>Setup &amp; Data Processing</strong>: Loads Python libraries, defines helper functions, and processes the raw data into an analysis-ready format with dummy variables.</li>
+<li><strong>Frequentist Analysis (Individual-Level)</strong>: Fits the ZBEn demand model to each rat’s data separately and performs linear contrasts on the estimated parameters.</li>
+<li><strong>Bayesian Analysis (Multilevel)</strong>: Fits a single, comprehensive Bayesian nonlinear mixed-effects model to the entire dataset, treating individual rats as random effects.</li>
 </ol>
 <div id="aa33070f" class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>{sys.executable} <span class="op">-</span>m pip install pandas numpy scipy lmfit PyMC</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Environment Setup ---</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># This cell installs the required Python packages for the analysis.</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Uncomment and run this cell only if you are setting up a new environment.</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co"># import sys</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># !{sys.executable} -m pip install pandas numpy scipy lmfit pymc arviz</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div id="e7bc8ca6" class="cell" data-execution_count="74">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> lmfit <span class="im">import</span> Model, Parameters</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pymc <span class="im">as</span> pm</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> arviz <span class="im">as</span> az</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pytensor.tensor <span class="im">as</span> pt</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Set the display format for floating-point numbers to 3 decimal places</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>pd.set_option(<span class="st">'display.float_format'</span>, <span class="st">'</span><span class="sc">{:.3f}</span><span class="st">'</span>.<span class="bu">format</span>)</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Helper Functions (translated from R) ---</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> lhs(x):</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Inverse Hyperbolic Sine (log-like) transformation."""</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.log10(<span class="fl">0.5</span> <span class="op">*</span> x <span class="op">+</span> np.sqrt(<span class="fl">0.25</span> <span class="op">*</span> (x<span class="op">**</span><span class="dv">2</span>) <span class="op">+</span> <span class="dv">1</span>))</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Load and Process Data ---</span></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>raw_dat <span class="op">=</span> pd.read_csv(<span class="st">"Code/dat.csv"</span>)</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Data loaded successfully."</span>)</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>dat <span class="op">=</span> raw_dat.copy()</span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>dat[<span class="st">'active_ses_time'</span>] <span class="op">=</span> (dat[<span class="st">'active_ses_time'</span>] <span class="op">/</span> <span class="dv">60</span>) <span class="op">/</span> <span class="dv">60</span></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>dat[<span class="st">'interact_rt'</span>] <span class="op">=</span> dat[<span class="st">'interact'</span>] <span class="op">/</span> dat[<span class="st">'active_ses_time'</span>]</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>dat[<span class="st">'lq'</span>] <span class="op">=</span> lhs(dat[<span class="st">'interact_rt'</span>])</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>dat[<span class="st">'fmlr'</span>] <span class="op">=</span> np.where(dat[<span class="st">'familiarity'</span>] <span class="op">==</span> <span class="dv">1</span>, <span class="st">"Cagemate"</span>, <span class="st">"Non-cagemate"</span>)</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>dat[<span class="st">'cond'</span>] <span class="op">=</span> dat[<span class="st">'cond'</span>].replace({<span class="st">"10sec"</span>: <span class="st">"10 Sec"</span>, <span class="st">"30sec"</span>: <span class="st">"30 Sec"</span>, <span class="st">"60sec"</span>: <span class="st">"60 Sec"</span>})</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>dat_agg <span class="op">=</span> dat.groupby([<span class="st">'pair'</span>, <span class="st">'fmlr'</span>, <span class="st">'cond'</span>, <span class="st">'fr'</span>], as_index<span class="op">=</span><span class="va">False</span>).agg(</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    interact_rt<span class="op">=</span>(<span class="st">'interact_rt'</span>, <span class="st">'mean'</span>),</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    lq<span class="op">=</span>(<span class="st">'lq'</span>, <span class="st">'mean'</span>)</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="co"># Create the specific interaction-like dummy variables required by the models</span></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>dat_processed <span class="op">=</span> dat_agg.copy()</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>dat_processed[<span class="st">'f1'</span>] <span class="op">=</span> ((dat_processed[<span class="st">'fmlr'</span>] <span class="op">==</span> <span class="st">'Cagemate'</span>) <span class="op">&amp;</span> (dat_processed[<span class="st">'cond'</span>] <span class="op">==</span> <span class="st">'10 Sec'</span>)).astype(<span class="bu">int</span>)</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>dat_processed[<span class="st">'f3'</span>] <span class="op">=</span> ((dat_processed[<span class="st">'fmlr'</span>] <span class="op">==</span> <span class="st">'Cagemate'</span>) <span class="op">&amp;</span> (dat_processed[<span class="st">'cond'</span>] <span class="op">==</span> <span class="st">'30 Sec'</span>)).astype(<span class="bu">int</span>)</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>dat_processed[<span class="st">'f6'</span>] <span class="op">=</span> ((dat_processed[<span class="st">'fmlr'</span>] <span class="op">==</span> <span class="st">'Cagemate'</span>) <span class="op">&amp;</span> (dat_processed[<span class="st">'cond'</span>] <span class="op">==</span> <span class="st">'60 Sec'</span>)).astype(<span class="bu">int</span>)</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>dat_processed[<span class="st">'u1'</span>] <span class="op">=</span> ((dat_processed[<span class="st">'fmlr'</span>] <span class="op">==</span> <span class="st">'Non-cagemate'</span>) <span class="op">&amp;</span> (dat_processed[<span class="st">'cond'</span>] <span class="op">==</span> <span class="st">'10 Sec'</span>)).astype(<span class="bu">int</span>)</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>dat_processed[<span class="st">'u3'</span>] <span class="op">=</span> ((dat_processed[<span class="st">'fmlr'</span>] <span class="op">==</span> <span class="st">'Non-cagemate'</span>) <span class="op">&amp;</span> (dat_processed[<span class="st">'cond'</span>] <span class="op">==</span> <span class="st">'30 Sec'</span>)).astype(<span class="bu">int</span>)</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>dat_processed[<span class="st">'u6'</span>] <span class="op">=</span> ((dat_processed[<span class="st">'fmlr'</span>] <span class="op">==</span> <span class="st">'Non-cagemate'</span>) <span class="op">&amp;</span> (dat_processed[<span class="st">'cond'</span>] <span class="op">==</span> <span class="st">'60 Sec'</span>)).astype(<span class="bu">int</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="e7bc8ca6" class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 1. SETUP: IMPORTS, FUNCTIONS, AND DATA PROCESSING ---</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 1.1 Load Libraries ---</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> warnings</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> lmfit <span class="im">import</span> Model</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pymc <span class="im">as</span> pm</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> arviz <span class="im">as</span> az</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pytensor.tensor <span class="im">as</span> pt</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Suppress warnings for a cleaner final report</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>warnings.filterwarnings(<span class="st">'ignore'</span>)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Set pandas display options for consistent formatting</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>pd.options.display.float_format <span class="op">=</span> <span class="st">'</span><span class="sc">{:.3f}</span><span class="st">'</span>.<span class="bu">format</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 1.2 Helper Functions for ZBEn Model ---</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> transform_IHS(x):</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="co">    Inverse Hyperbolic Sine (IHS) transformation.</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="co">    A log-like transformation that is defined at zero, required by the ZBEn model.</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.log10(<span class="fl">0.5</span> <span class="op">*</span> x <span class="op">+</span> np.sqrt(<span class="fl">0.25</span> <span class="op">*</span> (x<span class="op">**</span><span class="dv">2</span>) <span class="op">+</span> <span class="dv">1</span>))</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 1.3 Load and Process Data ---</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the raw data from a CSV file</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>raw_demand_df <span class="op">=</span> pd.read_csv(<span class="st">"dat.csv"</span>)</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Raw data loaded successfully."</span>)</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Process data into an analysis-ready format ---</span></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>processed_df <span class="op">=</span> raw_demand_df.copy()</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>processed_df[<span class="st">'active_session_hours'</span>] <span class="op">=</span> (processed_df[<span class="st">'active_ses_time'</span>] <span class="op">/</span> <span class="dv">60</span>) <span class="op">/</span> <span class="dv">60</span></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>processed_df[<span class="st">'interaction_rate'</span>] <span class="op">=</span> processed_df[<span class="st">'interact'</span>] <span class="op">/</span> processed_df[<span class="st">'active_session_hours'</span>]</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>processed_df[<span class="st">'lq'</span>] <span class="op">=</span> transform_IHS(processed_df[<span class="st">'interaction_rate'</span>])</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>processed_df[<span class="st">'familiarity_label'</span>] <span class="op">=</span> np.where(processed_df[<span class="st">'familiarity'</span>] <span class="op">==</span> <span class="dv">1</span>, <span class="st">"Cagemate"</span>, <span class="st">"Non_cagemate"</span>)</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>processed_df[<span class="st">'duration_label'</span>] <span class="op">=</span> processed_df[<span class="st">'cond'</span>].replace({</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>    <span class="st">"10sec"</span>: <span class="st">"10_Sec"</span>, <span class="st">"30sec"</span>: <span class="st">"30_Sec"</span>, <span class="st">"60sec"</span>: <span class="st">"60_Sec"</span></span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a><span class="co"># Aggregate data by averaging across sessions with the same price (fr)</span></span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>aggregated_df <span class="op">=</span> processed_df.groupby([<span class="st">'pair'</span>, <span class="st">'familiarity_label'</span>, <span class="st">'duration_label'</span>, <span class="st">'fr'</span>], as_index<span class="op">=</span><span class="va">False</span>).agg(</span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>    interaction_rate<span class="op">=</span>(<span class="st">'interaction_rate'</span>, <span class="st">'mean'</span>),</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    lq<span class="op">=</span>(<span class="st">'lq'</span>, <span class="st">'mean'</span>)</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Create dummy variables for regression models ---</span></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a><span class="co"># First, create a single interaction-style column for all 6 conditions</span></span>
+<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>aggregated_df[<span class="st">'condition'</span>] <span class="op">=</span> (</span>
+<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>    aggregated_df[<span class="st">'familiarity_label'</span>] <span class="op">+</span> <span class="st">"_"</span> <span class="op">+</span> aggregated_df[<span class="st">'duration_label'</span>]</span>
+<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a><span class="co"># Use pd.get_dummies to create the binary predictor variables</span></span>
+<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a>model_ready_df <span class="op">=</span> pd.get_dummies(aggregated_df, columns<span class="op">=</span>[<span class="st">'condition'</span>], prefix<span class="op">=</span><span class="st">''</span>, prefix_sep<span class="op">=</span><span class="st">''</span>)</span>
+<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a><span class="co"># Rename columns to be short and valid variable names for model formulas</span></span>
+<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>model_ready_df <span class="op">=</span> model_ready_df.rename(columns<span class="op">=</span>{</span>
+<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Cagemate_10_Sec'</span>: <span class="st">'f1'</span>,</span>
+<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Cagemate_30_Sec'</span>: <span class="st">'f3'</span>,</span>
+<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Cagemate_60_Sec'</span>: <span class="st">'f6'</span>,</span>
+<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Non_cagemate_10_Sec'</span>: <span class="st">'u1'</span>,</span>
+<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Non_cagemate_30_Sec'</span>: <span class="st">'u3'</span>,</span>
+<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Non_cagemate_60_Sec'</span>: <span class="st">'u6'</span></span>
+<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Individual-level data processed and ready for analysis."</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Data loaded successfully.</code></pre>
+<pre><code>Raw data loaded successfully.
+Individual-level data processed and ready for analysis.</code></pre>
 </div>
-</div>
-<section id="part-1-frequentist-individual-level-analysis" class="level2">
-<h2 class="anchored" data-anchor-id="part-1-frequentist-individual-level-analysis">Part 1: Frequentist Individual-Level Analysis</h2>
-<p>This section fits the ZBEn demand model to each subject’s data and performs linear contrasts on the estimated parameters.</p>
-<div id="675e9480" class="cell" data-execution_count="75">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Define the complex ZBEn model for lmfit ---</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> zbe_model_full(fr, f1, f3, f6, u1, u3, u6, </span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>                   af1, af3, af6, au1, au3, au6, </span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>                   qf1, qf3, qf6, qu1, qu3, qu6):</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    alpha_term <span class="op">=</span> np.exp(af1<span class="op">*</span>f1 <span class="op">+</span> af3<span class="op">*</span>f3 <span class="op">+</span> af6<span class="op">*</span>f6 <span class="op">+</span> au1<span class="op">*</span>u1 <span class="op">+</span> au3<span class="op">*</span>u3 <span class="op">+</span> au6<span class="op">*</span>u6)</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    q0_term <span class="op">=</span> qf1<span class="op">*</span>f1 <span class="op">+</span> qf3<span class="op">*</span>f3 <span class="op">+</span> qf6<span class="op">*</span>f6 <span class="op">+</span> qu1<span class="op">*</span>u1 <span class="op">+</span> qu3<span class="op">*</span>u3 <span class="op">+</span> qu6<span class="op">*</span>u6</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    lhs_q0 <span class="op">=</span> lhs(q0_term)</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> lhs_q0 <span class="op">*</span> np.exp((<span class="op">-</span>alpha_term <span class="op">/</span> lhs_q0) <span class="op">*</span> q0_term <span class="op">*</span> fr)</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>zbe_lmfit_model <span class="op">=</span> Model(zbe_model_full, independent_vars<span class="op">=</span>[<span class="st">'fr'</span>, <span class="st">'f1'</span>, <span class="st">'f3'</span>, <span class="st">'f6'</span>, <span class="st">'u1'</span>, <span class="st">'u3'</span>, <span class="st">'u6'</span>])</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Fit the model for each subject ---</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>param_list <span class="op">=</span> []</span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>contrast_list <span class="op">=</span> []</span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> subj_pair <span class="kw">in</span> dat_processed[<span class="st">'pair'</span>].unique():</span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    subj_data <span class="op">=</span> dat_processed[dat_processed[<span class="st">'pair'</span>] <span class="op">==</span> subj_pair]</span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    params <span class="op">=</span> zbe_lmfit_model.make_params(af1<span class="op">=-</span><span class="dv">6</span>, af3<span class="op">=-</span><span class="dv">6</span>, af6<span class="op">=-</span><span class="dv">6</span>, au1<span class="op">=-</span><span class="dv">6</span>, au3<span class="op">=-</span><span class="dv">6</span>, au6<span class="op">=-</span><span class="dv">6</span>,</span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>                                         qf1<span class="op">=</span><span class="dv">50</span>, qf3<span class="op">=</span><span class="dv">50</span>, qf6<span class="op">=</span><span class="dv">50</span>, qu1<span class="op">=</span><span class="dv">50</span>, qu3<span class="op">=</span><span class="dv">50</span>, qu6<span class="op">=</span><span class="dv">50</span>)</span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> p <span class="kw">in</span> params:</span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> p.startswith(<span class="st">'q'</span>):</span>
-<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>            params[p].<span class="bu">set</span>(<span class="bu">min</span><span class="op">=</span><span class="dv">0</span>)</span>
-<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>            </span>
-<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>    independent_vars_dict <span class="op">=</span> {</span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>        <span class="st">'fr'</span>: subj_data[<span class="st">'fr'</span>], <span class="st">'f1'</span>: subj_data[<span class="st">'f1'</span>], <span class="st">'f3'</span>: subj_data[<span class="st">'f3'</span>],</span>
-<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>        <span class="st">'f6'</span>: subj_data[<span class="st">'f6'</span>], <span class="st">'u1'</span>: subj_data[<span class="st">'u1'</span>], <span class="st">'u3'</span>: subj_data[<span class="st">'u3'</span>],</span>
-<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>        <span class="st">'u6'</span>: subj_data[<span class="st">'u6'</span>]</span>
-<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> zbe_lmfit_model.fit(subj_data[<span class="st">'lq'</span>], params, <span class="op">**</span>independent_vars_dict)</span>
-<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>    fit_params <span class="op">=</span> pd.DataFrame.from_dict(result.params.valuesdict(), orient<span class="op">=</span><span class="st">'index'</span>, columns<span class="op">=</span>[<span class="st">'estimate'</span>])</span>
-<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>    fit_params[<span class="st">'pair'</span>] <span class="op">=</span> subj_pair</span>
-<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>    param_list.append(fit_params)</span>
-<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>    alpha_fam_contrast <span class="op">=</span> result.eval_uncertainty(sigma<span class="op">=</span><span class="dv">1</span>, af1<span class="op">=</span><span class="dv">1</span>, af3<span class="op">=</span><span class="dv">1</span>, af6<span class="op">=</span><span class="dv">1</span>, au1<span class="op">=-</span><span class="dv">1</span>, au3<span class="op">=-</span><span class="dv">1</span>, au6<span class="op">=-</span><span class="dv">1</span>)</span>
-<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>    q0_fam_contrast <span class="op">=</span> result.eval_uncertainty(sigma<span class="op">=</span><span class="dv">1</span>, qf1<span class="op">=</span><span class="dv">1</span>, qf3<span class="op">=</span><span class="dv">1</span>, qf6<span class="op">=</span><span class="dv">1</span>, qu1<span class="op">=-</span><span class="dv">1</span>, qu3<span class="op">=-</span><span class="dv">1</span>, qu6<span class="op">=-</span><span class="dv">1</span>)</span>
-<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>    contrast_list.append({<span class="st">'pair'</span>: subj_pair, <span class="st">'parameter'</span>: <span class="st">'alpha'</span>, <span class="st">'contrast'</span>: <span class="st">'Cagemate vs. Non-cagemate'</span>, <span class="st">'estimate'</span>: alpha_fam_contrast})</span>
-<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>    contrast_list.append({<span class="st">'pair'</span>: subj_pair, <span class="st">'parameter'</span>: <span class="st">'Q0'</span>, <span class="st">'contrast'</span>: <span class="st">'Cagemate vs. Non-cagemate'</span>, <span class="st">'estimate'</span>: q0_fam_contrast})</span>
-<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Reformat and Display Results ---</span></span>
-<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>final_params <span class="op">=</span> pd.concat(param_list).reset_index().rename(columns<span class="op">=</span>{<span class="st">'index'</span>: <span class="st">'term'</span>})</span>
-<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>final_params[<span class="st">'parameter'</span>] <span class="op">=</span> np.where(final_params[<span class="st">'term'</span>].<span class="bu">str</span>.startswith(<span class="st">'a'</span>), <span class="st">'alpha'</span>, <span class="st">'Q0'</span>)</span>
-<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a>final_params[<span class="st">'Familiarity'</span>] <span class="op">=</span> np.where(final_params[<span class="st">'term'</span>].<span class="bu">str</span>.contains(<span class="st">'f'</span>), <span class="st">'Cagemate'</span>, <span class="st">'Non-cagemate'</span>)</span>
-<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a><span class="co"># Adding a string default value</span></span>
-<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a>final_params[<span class="st">'Social Duration'</span>] <span class="op">=</span> np.select(</span>
-<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a>    [final_params[<span class="st">'term'</span>].<span class="bu">str</span>.endswith(<span class="st">'1'</span>), final_params[<span class="st">'term'</span>].<span class="bu">str</span>.endswith(<span class="st">'3'</span>), final_params[<span class="st">'term'</span>].<span class="bu">str</span>.endswith(<span class="st">'6'</span>)],</span>
-<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a>    [<span class="st">'10 Sec'</span>, <span class="st">'30 Sec'</span>, <span class="st">'60 Sec'</span>],</span>
-<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a>    default<span class="op">=</span><span class="st">'N/A'</span> </span>
-<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a>final_params <span class="op">=</span> final_params[[<span class="st">'pair'</span>, <span class="st">'Familiarity'</span>, <span class="st">'Social Duration'</span>, <span class="st">'parameter'</span>, <span class="st">'estimate'</span>]]</span>
-<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a>final_contrasts <span class="op">=</span> pd.DataFrame(contrast_list)</span>
-<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"--- Estimated ZBEn Parameters (Individual Level) ---"</span>)</span>
-<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(final_params.to_string())</span>
-<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">--- Linear Contrast Results (p-values) ---"</span>)</span>
-<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a>final_contrasts_to_print <span class="op">=</span> final_contrasts.copy()</span>
-<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a>final_contrasts_to_print[<span class="st">'estimate'</span>] <span class="op">=</span> final_contrasts_to_print[<span class="st">'estimate'</span>].<span class="bu">apply</span>(</span>
-<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a>    <span class="kw">lambda</span> x: <span class="ss">f"est=</span><span class="sc">{</span>x[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss">, se=</span><span class="sc">{</span>x[<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">"</span></span>
-<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(final_contrasts_to_print)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>--- Estimated ZBEn Parameters (Individual Level) ---
-    pair   Familiarity Social Duration parameter  estimate
-0      1      Cagemate          10 Sec     alpha    -4.448
-1      1      Cagemate          30 Sec     alpha    -5.357
-2      1      Cagemate          60 Sec     alpha    -5.091
-3      1  Non-cagemate          10 Sec     alpha    -5.869
-4      1  Non-cagemate          30 Sec     alpha    -4.194
-5      1  Non-cagemate          60 Sec     alpha    -5.133
-6      1      Cagemate          10 Sec        Q0    47.955
-7      1      Cagemate          30 Sec        Q0    55.097
-8      1      Cagemate          60 Sec        Q0    57.832
-9      1  Non-cagemate          10 Sec        Q0    46.337
-10     1  Non-cagemate          30 Sec        Q0    53.984
-11     1  Non-cagemate          60 Sec        Q0    35.177
-12     2      Cagemate          10 Sec     alpha    -6.058
-13     2      Cagemate          30 Sec     alpha    -5.722
-14     2      Cagemate          60 Sec     alpha    -6.287
-15     2  Non-cagemate          10 Sec     alpha    -6.261
-16     2  Non-cagemate          30 Sec     alpha    -5.864
-17     2  Non-cagemate          60 Sec     alpha    -6.285
-18     2      Cagemate          10 Sec        Q0    68.034
-19     2      Cagemate          30 Sec        Q0    94.049
-20     2      Cagemate          60 Sec        Q0    82.281
-21     2  Non-cagemate          10 Sec        Q0    75.026
-22     2  Non-cagemate          30 Sec        Q0    65.055
-23     2  Non-cagemate          60 Sec        Q0    79.154
-24     3      Cagemate          10 Sec     alpha    -5.793
-25     3      Cagemate          30 Sec     alpha    -5.979
-26     3      Cagemate          60 Sec     alpha    -5.753
-27     3  Non-cagemate          10 Sec     alpha    -7.181
-28     3  Non-cagemate          30 Sec     alpha    -6.552
-29     3  Non-cagemate          60 Sec     alpha    -6.901
-30     3      Cagemate          10 Sec        Q0    51.310
-31     3      Cagemate          30 Sec        Q0   126.635
-32     3      Cagemate          60 Sec        Q0    28.950
-33     3  Non-cagemate          10 Sec        Q0    93.272
-34     3  Non-cagemate          30 Sec        Q0    47.529
-35     3  Non-cagemate          60 Sec        Q0   144.506
-36     4      Cagemate          10 Sec     alpha    -6.639
-37     4      Cagemate          30 Sec     alpha    -6.784
-38     4      Cagemate          60 Sec     alpha    -6.072
-39     4  Non-cagemate          10 Sec     alpha    -7.404
-40     4  Non-cagemate          30 Sec     alpha    -6.451
-41     4  Non-cagemate          60 Sec     alpha    -6.699
-42     4      Cagemate          10 Sec        Q0    39.086
-43     4      Cagemate          30 Sec        Q0    25.022
-44     4      Cagemate          60 Sec        Q0    18.007
-45     4  Non-cagemate          10 Sec        Q0    73.797
-46     4  Non-cagemate          30 Sec        Q0    58.536
-47     4  Non-cagemate          60 Sec        Q0    63.731
+<div class="cell-output cell-output-display">
+<div>
 
---- Linear Contrast Results (p-values) ---
-   pair parameter                   contrast             estimate
-0     1     alpha  Cagemate vs. Non-cagemate  est=0.000, se=0.000
-1     1        Q0  Cagemate vs. Non-cagemate  est=0.005, se=0.009
-2     2     alpha  Cagemate vs. Non-cagemate  est=0.000, se=0.000
-3     2        Q0  Cagemate vs. Non-cagemate  est=0.001, se=0.001
-4     3     alpha  Cagemate vs. Non-cagemate  est=0.000, se=0.000
-5     3        Q0  Cagemate vs. Non-cagemate  est=0.001, se=0.002
-6     4     alpha  Cagemate vs. Non-cagemate  est=0.000, se=0.000
-7     4        Q0  Cagemate vs. Non-cagemate  est=0.000, se=0.001</code></pre>
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">pair</th>
+<th data-quarto-table-cell-role="th">familiarity_label</th>
+<th data-quarto-table-cell-role="th">duration_label</th>
+<th data-quarto-table-cell-role="th">fr</th>
+<th data-quarto-table-cell-role="th">interaction_rate</th>
+<th data-quarto-table-cell-role="th">lq</th>
+<th data-quarto-table-cell-role="th">f1</th>
+<th data-quarto-table-cell-role="th">f3</th>
+<th data-quarto-table-cell-role="th">f6</th>
+<th data-quarto-table-cell-role="th">u1</th>
+<th data-quarto-table-cell-role="th">u3</th>
+<th data-quarto-table-cell-role="th">u6</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>1</td>
+<td>Cagemate</td>
+<td>10_Sec</td>
+<td>1</td>
+<td>19.099</td>
+<td>1.234</td>
+<td>True</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>1</td>
+<td>Cagemate</td>
+<td>10_Sec</td>
+<td>2</td>
+<td>6.136</td>
+<td>0.799</td>
+<td>True</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>1</td>
+<td>Cagemate</td>
+<td>10_Sec</td>
+<td>5</td>
+<td>2.017</td>
+<td>0.385</td>
+<td>True</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>1</td>
+<td>Cagemate</td>
+<td>10_Sec</td>
+<td>10</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>True</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>1</td>
+<td>Cagemate</td>
+<td>30_Sec</td>
+<td>1</td>
+<td>24.800</td>
+<td>1.381</td>
+<td>False</td>
+<td>True</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+</tr>
+</tbody>
+</table>
+
+</div>
 </div>
 </div>
 </section>
-<section id="part-2-bayesian-nonlinear-multilevel-analysis" class="level2">
-<h2 class="anchored" data-anchor-id="part-2-bayesian-nonlinear-multilevel-analysis">Part 2: Bayesian Nonlinear Multilevel Analysis</h2>
-<p>This section uses <code>PyMC</code> to fit a single nonlinear multilevel model to the entire dataset.</p>
-<div id="f59f7917" class="cell" data-execution_count="76">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"--- Building and Fitting Bayesian Model with PyMC (this will take several minutes) ---"</span>)</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Create numeric indices for pair, fmlr, and cond</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>dat_agg[<span class="st">'pair_idx'</span>] <span class="op">=</span> pd.Categorical(dat_agg[<span class="st">'pair'</span>]).codes</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>dat_agg[<span class="st">'fmlr_cond_idx'</span>] <span class="op">=</span> pd.Categorical(dat_agg[<span class="st">'fmlr'</span>] <span class="op">+</span> <span class="st">"_"</span> <span class="op">+</span> dat_agg[<span class="st">'cond'</span>]).codes</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Get dimensions</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>n_pairs <span class="op">=</span> dat_agg[<span class="st">'pair_idx'</span>].nunique()</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>n_fmlr_conds <span class="op">=</span> dat_agg[<span class="st">'fmlr_cond_idx'</span>].nunique()</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> pm.Model() <span class="im">as</span> pymc_model:</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    sd_a <span class="op">=</span> pm.Cauchy(<span class="st">"sd_a"</span>, <span class="dv">0</span>, <span class="fl">2.5</span>)</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    sd_b <span class="op">=</span> pm.Cauchy(<span class="st">"sd_b"</span>, <span class="dv">0</span>, <span class="fl">2.5</span>)</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>    a_coeffs <span class="op">=</span> pm.Cauchy(<span class="st">"a_coeffs"</span>, <span class="op">-</span><span class="dv">6</span>, <span class="fl">2.5</span>, shape<span class="op">=</span>n_fmlr_conds)</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>    b_coeffs <span class="op">=</span> pm.Cauchy(<span class="st">"b_coeffs"</span>, <span class="dv">4</span>, <span class="fl">2.5</span>, shape<span class="op">=</span>n_fmlr_conds)</span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>    a_pair_offset <span class="op">=</span> pm.Normal(<span class="st">"a_pair_offset"</span>, <span class="dv">0</span>, <span class="dv">1</span>, shape<span class="op">=</span>n_pairs)</span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>    a_pair <span class="op">=</span> pm.Deterministic(<span class="st">"a_pair"</span>, a_pair_offset <span class="op">*</span> sd_a)</span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>    b_pair_offset <span class="op">=</span> pm.Normal(<span class="st">"b_pair_offset"</span>, <span class="dv">0</span>, <span class="dv">1</span>, shape<span class="op">=</span>n_pairs)</span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>    b_pair <span class="op">=</span> pm.Deterministic(<span class="st">"b_pair"</span>, b_pair_offset <span class="op">*</span> sd_b)</span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>    a_est <span class="op">=</span> a_coeffs[dat_agg[<span class="st">'fmlr_cond_idx'</span>].values] <span class="op">+</span> a_pair[dat_agg[<span class="st">'pair_idx'</span>].values]</span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>    b_est <span class="op">=</span> b_coeffs[dat_agg[<span class="st">'fmlr_cond_idx'</span>].values] <span class="op">+</span> b_pair[dat_agg[<span class="st">'pair_idx'</span>].values]</span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>    mu <span class="op">=</span> pt.log10(<span class="fl">0.5</span><span class="op">*</span>pt.exp(b_est) <span class="op">+</span> pt.sqrt(<span class="fl">0.25</span><span class="op">*</span>(pt.exp(b_est)<span class="op">**</span><span class="dv">2</span>) <span class="op">+</span> <span class="dv">1</span>)) <span class="op">*</span> <span class="op">\</span></span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>         pt.exp((<span class="op">-</span>pt.exp(a_est) <span class="op">/</span> pt.log10(<span class="fl">0.5</span><span class="op">*</span>pt.exp(b_est) <span class="op">+</span> pt.sqrt(<span class="fl">0.25</span><span class="op">*</span>(pt.exp(b_est)<span class="op">**</span><span class="dv">2</span>) <span class="op">+</span> <span class="dv">1</span>))) <span class="op">*</span> pt.exp(b_est) <span class="op">*</span> dat_agg[<span class="st">'fr'</span>].values)</span>
-<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>    sigma <span class="op">=</span> pm.Cauchy(<span class="st">"sigma"</span>, <span class="dv">0</span>, <span class="fl">2.5</span>)</span>
-<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>    lq_obs <span class="op">=</span> pm.Normal(<span class="st">"lq_obs"</span>, mu<span class="op">=</span>mu, sigma<span class="op">=</span>sigma, observed<span class="op">=</span>dat_agg[<span class="st">'lq'</span>])</span>
-<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>    idata <span class="op">=</span> pm.sample(draws<span class="op">=</span><span class="dv">2000</span>, tune<span class="op">=</span><span class="dv">2000</span>, chains<span class="op">=</span><span class="dv">4</span>, cores<span class="op">=</span><span class="dv">4</span>, target_accept<span class="op">=</span><span class="fl">0.95</span>, progressbar<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Analyze Posterior ---</span></span>
-<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a mapping from fmlr_cond_idx back to descriptive names</span></span>
-<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>idx_to_name <span class="op">=</span> dat_agg[[<span class="st">'fmlr_cond_idx'</span>, <span class="st">'fmlr'</span>, <span class="st">'cond'</span>]].drop_duplicates().sort_values(<span class="st">'fmlr_cond_idx'</span>)</span>
-<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>fmlr_cond_names <span class="op">=</span> (idx_to_name[<span class="st">'fmlr'</span>] <span class="op">+</span> <span class="st">"_"</span> <span class="op">+</span> idx_to_name[<span class="st">'cond'</span>]).<span class="bu">str</span>.replace(<span class="st">" "</span>, <span class="st">"_"</span>).tolist()</span>
-<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract the posterior samples into a DataFrame </span></span>
-<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>a_samples <span class="op">=</span> idata.posterior[<span class="st">'a_coeffs'</span>].stack(sample<span class="op">=</span>(<span class="st">"chain"</span>, <span class="st">"draw"</span>)).values.T</span>
-<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a>b_samples <span class="op">=</span> idata.posterior[<span class="st">'b_coeffs'</span>].stack(sample<span class="op">=</span>(<span class="st">"chain"</span>, <span class="st">"draw"</span>)).values.T</span>
-<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a>a_draws <span class="op">=</span> pd.DataFrame(a_samples, columns<span class="op">=</span>fmlr_cond_names)</span>
-<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a>b_draws <span class="op">=</span> pd.DataFrame(b_samples, columns<span class="op">=</span>fmlr_cond_names)</span>
-<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a><span class="co"># Programmatically find the column names to make the code robust</span></span>
-<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a>cagemate_cols_a <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> a_draws.columns <span class="cf">if</span> <span class="st">'Cagemate'</span> <span class="kw">in</span> col]</span>
-<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a>non_cagemate_cols_a <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> a_draws.columns <span class="cf">if</span> <span class="st">'Non-cagemate'</span> <span class="kw">in</span> col]</span>
-<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a>cagemate_10_a <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> cagemate_cols_a <span class="cf">if</span> <span class="st">'10_Sec'</span> <span class="kw">in</span> col][<span class="dv">0</span>]</span>
-<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a>cagemate_60_a <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> cagemate_cols_a <span class="cf">if</span> <span class="st">'60_Sec'</span> <span class="kw">in</span> col][<span class="dv">0</span>]</span>
-<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a>non_cagemate_10_a <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> non_cagemate_cols_a <span class="cf">if</span> <span class="st">'10_Sec'</span> <span class="kw">in</span> col][<span class="dv">0</span>]</span>
-<span id="cb6-53"><a href="#cb6-53" aria-hidden="true" tabindex="-1"></a>non_cagemate_60_a <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> non_cagemate_cols_a <span class="cf">if</span> <span class="st">'60_Sec'</span> <span class="kw">in</span> col][<span class="dv">0</span>]</span>
-<span id="cb6-54"><a href="#cb6-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-55"><a href="#cb6-55" aria-hidden="true" tabindex="-1"></a>cagemate_cols_b <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> b_draws.columns <span class="cf">if</span> <span class="st">'Cagemate'</span> <span class="kw">in</span> col]</span>
-<span id="cb6-56"><a href="#cb6-56" aria-hidden="true" tabindex="-1"></a>non_cagemate_cols_b <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> b_draws.columns <span class="cf">if</span> <span class="st">'Non-cagemate'</span> <span class="kw">in</span> col]</span>
-<span id="cb6-57"><a href="#cb6-57" aria-hidden="true" tabindex="-1"></a>cagemate_10_b <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> cagemate_cols_b <span class="cf">if</span> <span class="st">'10_Sec'</span> <span class="kw">in</span> col][<span class="dv">0</span>]</span>
-<span id="cb6-58"><a href="#cb6-58" aria-hidden="true" tabindex="-1"></a>cagemate_60_b <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> cagemate_cols_b <span class="cf">if</span> <span class="st">'60_Sec'</span> <span class="kw">in</span> col][<span class="dv">0</span>]</span>
-<span id="cb6-59"><a href="#cb6-59" aria-hidden="true" tabindex="-1"></a>non_cagemate_10_b <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> non_cagemate_cols_b <span class="cf">if</span> <span class="st">'10_Sec'</span> <span class="kw">in</span> col][<span class="dv">0</span>]</span>
-<span id="cb6-60"><a href="#cb6-60" aria-hidden="true" tabindex="-1"></a>non_cagemate_60_b <span class="op">=</span> [col <span class="cf">for</span> col <span class="kw">in</span> non_cagemate_cols_b <span class="cf">if</span> <span class="st">'60_Sec'</span> <span class="kw">in</span> col][<span class="dv">0</span>]</span>
-<span id="cb6-61"><a href="#cb6-61" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-62"><a href="#cb6-62" aria-hidden="true" tabindex="-1"></a><span class="co"># Perform calculations using the retrieved column names</span></span>
-<span id="cb6-63"><a href="#cb6-63" aria-hidden="true" tabindex="-1"></a>alpha_summary <span class="op">=</span> pd.DataFrame({</span>
-<span id="cb6-64"><a href="#cb6-64" aria-hidden="true" tabindex="-1"></a>    <span class="st">'familiarity'</span>: (a_draws[cagemate_cols_a].<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>) <span class="op">-</span> a_draws[non_cagemate_cols_a].<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>)),</span>
-<span id="cb6-65"><a href="#cb6-65" aria-hidden="true" tabindex="-1"></a>    <span class="st">'duration_linear'</span>: ((<span class="op">-</span><span class="dv">1</span>)<span class="op">*</span>a_draws[cagemate_10_a] <span class="op">+</span> <span class="dv">1</span><span class="op">*</span>a_draws[cagemate_60_a]) <span class="op">+</span> <span class="op">\</span></span>
-<span id="cb6-66"><a href="#cb6-66" aria-hidden="true" tabindex="-1"></a>                       ((<span class="op">-</span><span class="dv">1</span>)<span class="op">*</span>a_draws[non_cagemate_10_a] <span class="op">+</span> <span class="dv">1</span><span class="op">*</span>a_draws[non_cagemate_60_a])</span>
-<span id="cb6-67"><a href="#cb6-67" aria-hidden="true" tabindex="-1"></a>})</span>
-<span id="cb6-68"><a href="#cb6-68" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-69"><a href="#cb6-69" aria-hidden="true" tabindex="-1"></a>q0_summary <span class="op">=</span> pd.DataFrame({</span>
-<span id="cb6-70"><a href="#cb6-70" aria-hidden="true" tabindex="-1"></a>    <span class="st">'familiarity'</span>: (b_draws[cagemate_cols_b].<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>) <span class="op">-</span> b_draws[non_cagemate_cols_b].<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>)),</span>
-<span id="cb6-71"><a href="#cb6-71" aria-hidden="true" tabindex="-1"></a>    <span class="st">'duration_linear'</span>: ((<span class="op">-</span><span class="dv">1</span>)<span class="op">*</span>b_draws[cagemate_10_b] <span class="op">+</span> <span class="dv">1</span><span class="op">*</span>b_draws[cagemate_60_b]) <span class="op">+</span> <span class="op">\</span></span>
-<span id="cb6-72"><a href="#cb6-72" aria-hidden="true" tabindex="-1"></a>                       ((<span class="op">-</span><span class="dv">1</span>)<span class="op">*</span>b_draws[non_cagemate_10_b] <span class="op">+</span> <span class="dv">1</span><span class="op">*</span>b_draws[non_cagemate_60_b])</span>
-<span id="cb6-73"><a href="#cb6-73" aria-hidden="true" tabindex="-1"></a>})</span>
-<span id="cb6-74"><a href="#cb6-74" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-75"><a href="#cb6-75" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">--- Posterior Summary for Contrasts on Alpha ---"</span>)</span>
-<span id="cb6-76"><a href="#cb6-76" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(alpha_summary.quantile([<span class="fl">0.025</span>, <span class="fl">0.5</span>, <span class="fl">0.975</span>]).T.rename(columns<span class="op">=</span>{<span class="fl">0.5</span>: <span class="st">'median'</span>, <span class="fl">0.025</span>: <span class="st">'lower'</span>, <span class="fl">0.975</span>: <span class="st">'upper'</span>}))</span>
-<span id="cb6-77"><a href="#cb6-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-78"><a href="#cb6-78" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">--- Posterior Summary for Contrasts on Q0 ---"</span>)</span>
-<span id="cb6-79"><a href="#cb6-79" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(q0_summary.quantile([<span class="fl">0.025</span>, <span class="fl">0.5</span>, <span class="fl">0.975</span>]).T.rename(columns<span class="op">=</span>{<span class="fl">0.5</span>: <span class="st">'median'</span>, <span class="fl">0.025</span>: <span class="st">'lower'</span>, <span class="fl">0.975</span>: <span class="st">'upper'</span>}))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<section id="frequentist-analysis-individual-level" class="level2">
+<h2 class="anchored" data-anchor-id="frequentist-analysis-individual-level">2. Frequentist Analysis (Individual-Level)</h2>
+<p>This section replicates the first analytical approach from the paper, fitting the <strong>Zero-Bounded Exponential (ZBEn) demand model</strong> to each rat’s data separately for all experimental conditions. This individual-level method allows for a direct examination of between-subject variability.</p>
+<p>The ZBEn model is a nonlinear function that describes how consumption of a reinforcer (here, social interaction rate) decreases as its price increases. By fitting this model using the <code>lmfit</code> library, we can extract two key parameters that quantify the value of the reinforcer for each condition: - <strong><span class="math inline">\(Q_{0}\)</span> (Demand Intensity)</strong>: The predicted level of consumption when the price is zero. A higher <span class="math inline">\(Q_{0}\)</span> indicates a higher overall demand. - <strong><span class="math inline">\(\alpha\)</span> (Elasticity)</strong>: The rate at which consumption decreases as the price increases. A higher <span class="math inline">\(\alpha\)</span> indicates that demand is more sensitive to price (i.e., more elastic).</p>
+<p>After fitting the models, we perform linear contrasts on the estimated parameters to test the primary hypotheses: whether social familiarity or interaction duration systematically affected demand intensity (<span class="math inline">\(Q_{0}\)</span>) or elasticity (<span class="math inline">\(\alpha\)</span>).</p>
+<div id="675e9480" class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> lmfit <span class="im">import</span> Model</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.stats <span class="im">import</span> t</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 2.1 Define and Fit the ZBEn Demand Model for Each Rat ---</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> zbe_model_func(fr, f1, f3, f6, u1, u3, u6, </span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>                   af1, af3, af6, au1, au3, au6, </span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>                   qf1, qf3, qf6, qu1, qu3, qu6):</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="co">    Zero-Bounded Exponential (ZBEn) demand model function for lmfit.</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co">    This function uses dummy variables (f1, u1, etc.) to estimate a unique</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="co">    alpha (a) and Q0 (q) for each of the 6 experimental conditions.</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    alpha_term <span class="op">=</span> np.exp(af1<span class="op">*</span>f1 <span class="op">+</span> af3<span class="op">*</span>f3 <span class="op">+</span> af6<span class="op">*</span>f6 <span class="op">+</span> au1<span class="op">*</span>u1 <span class="op">+</span> au3<span class="op">*</span>u3 <span class="op">+</span> au6<span class="op">*</span>u6)</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    q0_term <span class="op">=</span> qf1<span class="op">*</span>f1 <span class="op">+</span> qf3<span class="op">*</span>f3 <span class="op">+</span> qf6<span class="op">*</span>f6 <span class="op">+</span> qu1<span class="op">*</span>u1 <span class="op">+</span> qu3<span class="op">*</span>u3 <span class="op">+</span> qu6<span class="op">*</span>u6</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    lhs_q0 <span class="op">=</span> transform_IHS(q0_term)</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> lhs_q0 <span class="op">*</span> np.exp((<span class="op">-</span>alpha_term <span class="op">/</span> lhs_q0) <span class="op">*</span> q0_term <span class="op">*</span> fr)</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Create an lmfit Model object</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>zbe_lmfit_model <span class="op">=</span> Model(</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>    zbe_model_func, </span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    independent_vars<span class="op">=</span>[<span class="st">'fr'</span>, <span class="st">'f1'</span>, <span class="st">'f3'</span>, <span class="st">'f6'</span>, <span class="st">'u1'</span>, <span class="st">'u3'</span>, <span class="st">'u6'</span>]</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Loop through each rat to fit the model and perform contrasts ---</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>parameter_list <span class="op">=</span> []</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>contrast_list <span class="op">=</span> []</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> rat_id <span class="kw">in</span> model_ready_df[<span class="st">'pair'</span>].unique():</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>    rat_data <span class="op">=</span> model_ready_df[model_ready_df[<span class="st">'pair'</span>] <span class="op">==</span> rat_id]</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Set up initial parameter values for the fit</span></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>    fit_params <span class="op">=</span> zbe_lmfit_model.make_params(</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>        af1<span class="op">=-</span><span class="dv">6</span>, af3<span class="op">=-</span><span class="dv">6</span>, af6<span class="op">=-</span><span class="dv">6</span>, au1<span class="op">=-</span><span class="dv">6</span>, au3<span class="op">=-</span><span class="dv">6</span>, au6<span class="op">=-</span><span class="dv">6</span>,</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>        qf1<span class="op">=</span><span class="dv">50</span>, qf3<span class="op">=</span><span class="dv">50</span>, qf6<span class="op">=</span><span class="dv">50</span>, qu1<span class="op">=</span><span class="dv">50</span>, qu3<span class="op">=</span><span class="dv">50</span>, qu6<span class="op">=</span><span class="dv">50</span></span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Constrain Q0 parameters to be non-negative</span></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> p_name <span class="kw">in</span> fit_params:</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> p_name.startswith(<span class="st">'q'</span>):</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>            fit_params[p_name].<span class="bu">set</span>(<span class="bu">min</span><span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Define the independent variables for the fit</span></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>    independent_vars <span class="op">=</span> {</span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a>        <span class="st">'fr'</span>: rat_data[<span class="st">'fr'</span>], <span class="st">'f1'</span>: rat_data[<span class="st">'f1'</span>], <span class="st">'f3'</span>: rat_data[<span class="st">'f3'</span>],</span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a>        <span class="st">'f6'</span>: rat_data[<span class="st">'f6'</span>], <span class="st">'u1'</span>: rat_data[<span class="st">'u1'</span>], <span class="st">'u3'</span>: rat_data[<span class="st">'u3'</span>],</span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a>        <span class="st">'u6'</span>: rat_data[<span class="st">'u6'</span>]</span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Fit the model</span></span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> zbe_lmfit_model.fit(rat_data[<span class="st">'lq'</span>], fit_params, <span class="op">**</span>independent_vars)</span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Store the parameter estimates</span></span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a>    params_df <span class="op">=</span> pd.DataFrame.from_dict(result.params.valuesdict(), orient<span class="op">=</span><span class="st">'index'</span>, columns<span class="op">=</span>[<span class="st">'estimate'</span>])</span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a>    params_df[<span class="st">'rat_id'</span>] <span class="op">=</span> rat_id</span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a>    parameter_list.append(params_df)</span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a>    <span class="co"># --- Perform Linear Contrasts Manually ---</span></span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a>    contrasts_to_test <span class="op">=</span> {</span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a>        <span class="st">'alpha'</span>: {<span class="st">'af1'</span>:<span class="dv">1</span>, <span class="st">'af3'</span>:<span class="dv">1</span>, <span class="st">'af6'</span>:<span class="dv">1</span>, <span class="st">'au1'</span>:<span class="op">-</span><span class="dv">1</span>, <span class="st">'au3'</span>:<span class="op">-</span><span class="dv">1</span>, <span class="st">'au6'</span>:<span class="op">-</span><span class="dv">1</span>},</span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a>        <span class="st">'Q0'</span>:    {<span class="st">'qf1'</span>:<span class="dv">1</span>, <span class="st">'qf3'</span>:<span class="dv">1</span>, <span class="st">'qf6'</span>:<span class="dv">1</span>, <span class="st">'qu1'</span>:<span class="op">-</span><span class="dv">1</span>, <span class="st">'qu3'</span>:<span class="op">-</span><span class="dv">1</span>, <span class="st">'qu6'</span>:<span class="op">-</span><span class="dv">1</span>}</span>
+<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Get the covariance matrix and ensure parameter order is correct</span></span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a>    covar_matrix <span class="op">=</span> result.covar</span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a>    param_names <span class="op">=</span> result.var_names</span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> param_name, expression <span class="kw">in</span> contrasts_to_test.items():</span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Create a contrast vector C with weights, ordered to match the covariance matrix</span></span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a>        contrast_vector <span class="op">=</span> np.array([expression.get(p, <span class="dv">0</span>) <span class="cf">for</span> p <span class="kw">in</span> param_names])</span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Calculate the contrast estimate: C * B</span></span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a>        est <span class="op">=</span> contrast_vector <span class="op">@</span> np.array([result.params[p].value <span class="cf">for</span> p <span class="kw">in</span> param_names])</span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Calculate the standard error of the contrast: sqrt(C' * Cov(B) * C)</span></span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a>        variance <span class="op">=</span> contrast_vector.T <span class="op">@</span> covar_matrix <span class="op">@</span> contrast_vector</span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a>        stderr <span class="op">=</span> np.sqrt(variance)</span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Calculate t-statistic and two-tailed p-value</span></span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a>        t_stat <span class="op">=</span> est <span class="op">/</span> stderr <span class="cf">if</span> stderr <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">else</span> <span class="dv">0</span></span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a>        p_val <span class="op">=</span> t.sf(np.<span class="bu">abs</span>(t_stat), df<span class="op">=</span>result.nfree) <span class="op">*</span> <span class="dv">2</span></span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a>        contrast_list.append({</span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a>            <span class="st">'rat_id'</span>: rat_id, <span class="st">'parameter'</span>: param_name, <span class="st">'contrast'</span>: <span class="st">'Cagemate vs. Non-cagemate'</span>,</span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a>            <span class="st">'estimate'</span>: est, <span class="st">'std_error'</span>: stderr, <span class="st">'t_value'</span>: t_stat, <span class="st">'p_value'</span>: p_val</span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a>        })</span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 2.2 Format and Display Results ---</span></span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a><span class="co"># Combine parameter estimates from all rats into a single DataFrame</span></span>
+<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a>individual_parameter_estimates <span class="op">=</span> pd.concat(parameter_list).reset_index().rename(columns<span class="op">=</span>{<span class="st">'index'</span>: <span class="st">'term'</span>})</span>
+<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a>individual_parameter_estimates[[<span class="st">'parameter_type'</span>, <span class="st">'familiarity_code'</span>, <span class="st">'duration_code'</span>]] <span class="op">=</span> <span class="op">\</span></span>
+<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a>    individual_parameter_estimates[<span class="st">'term'</span>].<span class="bu">str</span>.extract(<span class="vs">r'</span><span class="kw">(</span><span class="vs">a</span><span class="cf">|</span><span class="vs">q</span><span class="kw">)(</span><span class="vs">f</span><span class="cf">|</span><span class="vs">u</span><span class="kw">)(</span><span class="dv">\d</span><span class="kw">)</span><span class="vs">'</span>).fillna(<span class="st">''</span>)</span>
+<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a>individual_parameter_estimates[<span class="st">'parameter'</span>] <span class="op">=</span> np.where(individual_parameter_estimates[<span class="st">'parameter_type'</span>] <span class="op">==</span> <span class="st">'a'</span>, <span class="st">'alpha'</span>, <span class="st">'Q0'</span>)</span>
+<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a>individual_parameter_estimates[<span class="st">'Familiarity'</span>] <span class="op">=</span> np.where(individual_parameter_estimates[<span class="st">'familiarity_code'</span>] <span class="op">==</span> <span class="st">'f'</span>, <span class="st">'Cagemate'</span>, <span class="st">'Non-cagemate'</span>)</span>
+<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a>individual_parameter_estimates[<span class="st">'Duration'</span>] <span class="op">=</span> individual_parameter_estimates[<span class="st">'duration_code'</span>].replace({<span class="st">'1'</span>:<span class="st">'10 Sec'</span>, <span class="st">'3'</span>:<span class="st">'30 Sec'</span>, <span class="st">'6'</span>:<span class="st">'60 Sec'</span>})</span>
+<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a>final_params_df <span class="op">=</span> individual_parameter_estimates[[<span class="st">'rat_id'</span>, <span class="st">'Familiarity'</span>, <span class="st">'Duration'</span>, <span class="st">'parameter'</span>, <span class="st">'estimate'</span>]]</span>
+<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a><span class="co"># Combine contrast results into a single DataFrame</span></span>
+<span id="cb4-99"><a href="#cb4-99" aria-hidden="true" tabindex="-1"></a>final_contrasts_df <span class="op">=</span> pd.DataFrame(contrast_list)</span>
+<span id="cb4-100"><a href="#cb4-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"--- Estimated ZBEn Parameters (Individual Level) ---"</span>)</span>
+<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a>display(final_params_df)</span>
+<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">--- Linear Contrast Results ---"</span>)</span>
+<span id="cb4-104"><a href="#cb4-104" aria-hidden="true" tabindex="-1"></a>display(final_contrasts_df)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="bayesian-nonlinear-multilevel-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="bayesian-nonlinear-multilevel-analysis">3. Bayesian Nonlinear Multilevel Analysis</h2>
+<p>This section presents a more sophisticated analytical approach by fitting a single <strong>Bayesian nonlinear multilevel model</strong> to the entire dataset using <code>PyMC</code>. This method offers several advantages over the individual-level frequentist analysis:</p>
+<ul>
+<li><strong>Principled Regularization</strong>: By treating individual rats as “random effects,” the model uses a technique called <strong>partial pooling</strong>. This allows each rat’s parameter estimates to be informed by the overall group average, leading to more stable and realistic estimates, especially with small sample sizes.</li>
+<li><strong>Unified Framework</strong>: Instead of fitting 24 separate models (4 rats x 6 conditions), we fit one comprehensive model. This provides a single, coherent framework for testing hypotheses about the main effects of familiarity and duration.</li>
+<li><strong>Full Posterior Inference</strong>: This approach yields the full posterior distribution for every parameter and contrast, giving us a complete picture of our uncertainty about the effects.</li>
+</ul>
+<p>The model estimates fixed effects for the experimental conditions (familiarity and duration) and random effects for each rat’s deviation from those fixed effects, directly modeling the between-subject variability within a hierarchical structure.</p>
+<div id="f59f7917" class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 3.1 Define and Fit the Bayesian Multilevel Model ---</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"--- Building and Fitting Bayesian Model with PyMC (this may take several minutes) ---"</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Use aggregated_df for the Bayesian model, as it retains the 'condition' column ---</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>bayes_df <span class="op">=</span> aggregated_df.copy()</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Define coordinates for the model dimensions, a best practice for PyMC</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>condition_names <span class="op">=</span> <span class="bu">sorted</span>(bayes_df[<span class="st">'condition'</span>].unique())</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>rat_names <span class="op">=</span> <span class="bu">sorted</span>(bayes_df[<span class="st">'pair'</span>].unique())</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>coords <span class="op">=</span> {</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">"condition"</span>: condition_names,</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">"rat"</span>: rat_names,</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    <span class="st">"obs_id"</span>: bayes_df.index</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Create numeric indices for mapping observations to the correct parameters</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>rat_idx <span class="op">=</span> pd.Categorical(bayes_df[<span class="st">'pair'</span>], categories<span class="op">=</span>rat_names).codes</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>condition_idx <span class="op">=</span> pd.Categorical(bayes_df[<span class="st">'condition'</span>], categories<span class="op">=</span>condition_names).codes</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> pm.Model(coords<span class="op">=</span>coords) <span class="im">as</span> multilevel_zbe_model:</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># --- Priors for Random Effects (Rat-level variability) ---</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Non-centered parameterization for better sampling efficiency</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>    sd_alpha <span class="op">=</span> pm.HalfCauchy(<span class="st">"sd_alpha"</span>, beta<span class="op">=</span><span class="fl">2.5</span>)</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>    z_alpha <span class="op">=</span> pm.Normal(<span class="st">"z_alpha"</span>, mu<span class="op">=</span><span class="dv">0</span>, sigma<span class="op">=</span><span class="dv">1</span>, dims<span class="op">=</span><span class="st">"rat"</span>)</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>    rat_effect_alpha <span class="op">=</span> pm.Deterministic(<span class="st">"rat_effect_alpha"</span>, z_alpha <span class="op">*</span> sd_alpha, dims<span class="op">=</span><span class="st">"rat"</span>)</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>    sd_q0 <span class="op">=</span> pm.HalfCauchy(<span class="st">"sd_q0"</span>, beta<span class="op">=</span><span class="fl">2.5</span>)</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>    z_q0 <span class="op">=</span> pm.Normal(<span class="st">"z_q0"</span>, mu<span class="op">=</span><span class="dv">0</span>, sigma<span class="op">=</span><span class="dv">1</span>, dims<span class="op">=</span><span class="st">"rat"</span>)</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>    rat_effect_q0 <span class="op">=</span> pm.Deterministic(<span class="st">"rat_effect_q0"</span>, z_q0 <span class="op">*</span> sd_q0, dims<span class="op">=</span><span class="st">"rat"</span>)</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>    <span class="co"># --- Priors for Fixed Effects (Condition-level means) ---</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Weakly informative priors based on the frequentist results and theory</span></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Parameters are estimated on the log scale to ensure they are positive</span></span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>    log_alpha_coeffs <span class="op">=</span> pm.Normal(<span class="st">"log_alpha"</span>, mu<span class="op">=-</span><span class="dv">6</span>, sigma<span class="op">=</span><span class="fl">2.5</span>, dims<span class="op">=</span><span class="st">"condition"</span>)</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>    log_q0_coeffs <span class="op">=</span> pm.Normal(<span class="st">"log_q0"</span>, mu<span class="op">=</span><span class="dv">4</span>, sigma<span class="op">=</span><span class="fl">2.5</span>, dims<span class="op">=</span><span class="st">"condition"</span>)</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>    <span class="co"># --- Combine Fixed and Random Effects ---</span></span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>    log_alpha_est <span class="op">=</span> log_alpha_coeffs[condition_idx] <span class="op">+</span> rat_effect_alpha[rat_idx]</span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>    log_q0_est <span class="op">=</span> log_q0_coeffs[condition_idx] <span class="op">+</span> rat_effect_q0[rat_idx]</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>    alpha <span class="op">=</span> pm.Deterministic(<span class="st">"alpha"</span>, pt.exp(log_alpha_est), dims<span class="op">=</span><span class="st">"obs_id"</span>)</span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>    q0 <span class="op">=</span> pm.Deterministic(<span class="st">"q0"</span>, pt.exp(log_q0_est), dims<span class="op">=</span><span class="st">"obs_id"</span>)</span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a>    <span class="co"># --- ZBEn Model Equation (Likelihood Mu) ---</span></span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>    ihs_q0 <span class="op">=</span> transform_IHS(q0)</span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a>    mu <span class="op">=</span> ihs_q0 <span class="op">*</span> pt.exp((<span class="op">-</span>alpha <span class="op">/</span> ihs_q0) <span class="op">*</span> q0 <span class="op">*</span> bayes_df[<span class="st">'fr'</span>].values)</span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>    <span class="co"># --- Likelihood ---</span></span>
+<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a>    sigma <span class="op">=</span> pm.HalfCauchy(<span class="st">"sigma"</span>, beta<span class="op">=</span><span class="fl">2.5</span>)</span>
+<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a>    lq_obs <span class="op">=</span> pm.Normal(<span class="st">"lq_obs"</span>, mu<span class="op">=</span>mu, sigma<span class="op">=</span>sigma, observed<span class="op">=</span>bayes_df[<span class="st">'lq'</span>], dims<span class="op">=</span><span class="st">"obs_id"</span>)</span>
+<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a>    <span class="co"># --- MCMC Sampling ---</span></span>
+<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a>    idata <span class="op">=</span> pm.sample(draws<span class="op">=</span><span class="dv">2000</span>, tune<span class="op">=</span><span class="dv">2000</span>, chains<span class="op">=</span><span class="dv">4</span>, cores<span class="op">=</span><span class="dv">4</span>, </span>
+<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a>                      target_accept<span class="op">=</span><span class="fl">0.95</span>, progressbar<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 3.2 Analyze Posterior Contrasts ---</span></span>
+<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> summarize_contrasts(posterior_draws):</span>
+<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
+<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a><span class="co">    Helper function to calculate median and 95% HDI for contrast distributions.</span></span>
+<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a><span class="co">    This version is corrected to use xarray syntax before converting to pandas.</span></span>
+<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb5-65"><a href="#cb5-65" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Calculate quantiles using xarray's method, which creates a 'quantile' coordinate</span></span>
+<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a>    quantiles <span class="op">=</span> posterior_draws.quantile([<span class="fl">0.025</span>, <span class="fl">0.5</span>, <span class="fl">0.975</span>], dim<span class="op">=</span>(<span class="st">"chain"</span>, <span class="st">"draw"</span>))</span>
+<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Re-label the values of the 'quantile' coordinate</span></span>
+<span id="cb5-68"><a href="#cb5-68" aria-hidden="true" tabindex="-1"></a>    quantiles <span class="op">=</span> quantiles.assign_coords(quantile<span class="op">=</span>[<span class="st">'lower_ci'</span>, <span class="st">'median'</span>, <span class="st">'upper_ci'</span>])</span>
+<span id="cb5-69"><a href="#cb5-69" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Convert the labeled xarray object to a pandas Series</span></span>
+<span id="cb5-70"><a href="#cb5-70" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> quantiles.to_series()</span>
+<span id="cb5-71"><a href="#cb5-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-72"><a href="#cb5-72" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Define condition groups for contrasts ---</span></span>
+<span id="cb5-73"><a href="#cb5-73" aria-hidden="true" tabindex="-1"></a>cagemate_conds <span class="op">=</span> [c <span class="cf">for</span> c <span class="kw">in</span> condition_names <span class="cf">if</span> <span class="st">'Cagemate'</span> <span class="kw">in</span> c]</span>
+<span id="cb5-74"><a href="#cb5-74" aria-hidden="true" tabindex="-1"></a>non_cagemate_conds <span class="op">=</span> [c <span class="cf">for</span> c <span class="kw">in</span> condition_names <span class="cf">if</span> <span class="st">'Non_cagemate'</span> <span class="kw">in</span> c]</span>
+<span id="cb5-75"><a href="#cb5-75" aria-hidden="true" tabindex="-1"></a>conds_10_sec <span class="op">=</span> [c <span class="cf">for</span> c <span class="kw">in</span> condition_names <span class="cf">if</span> <span class="st">'10_Sec'</span> <span class="kw">in</span> c]</span>
+<span id="cb5-76"><a href="#cb5-76" aria-hidden="true" tabindex="-1"></a>conds_60_sec <span class="op">=</span> [c <span class="cf">for</span> c <span class="kw">in</span> condition_names <span class="cf">if</span> <span class="st">'60_Sec'</span> <span class="kw">in</span> c]</span>
+<span id="cb5-77"><a href="#cb5-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-78"><a href="#cb5-78" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Extract posterior draws for alpha and Q0 ---</span></span>
+<span id="cb5-79"><a href="#cb5-79" aria-hidden="true" tabindex="-1"></a>posterior_log_alpha <span class="op">=</span> idata.posterior[<span class="st">"log_alpha"</span>]</span>
+<span id="cb5-80"><a href="#cb5-80" aria-hidden="true" tabindex="-1"></a>posterior_log_q0 <span class="op">=</span> idata.posterior[<span class="st">"log_q0"</span>]</span>
+<span id="cb5-81"><a href="#cb5-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-82"><a href="#cb5-82" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Calculate Alpha Contrasts ---</span></span>
+<span id="cb5-83"><a href="#cb5-83" aria-hidden="true" tabindex="-1"></a>contrast_alpha_familiarity <span class="op">=</span> (</span>
+<span id="cb5-84"><a href="#cb5-84" aria-hidden="true" tabindex="-1"></a>    posterior_log_alpha.sel(condition<span class="op">=</span>cagemate_conds).mean(dim<span class="op">=</span><span class="st">"condition"</span>) <span class="op">-</span></span>
+<span id="cb5-85"><a href="#cb5-85" aria-hidden="true" tabindex="-1"></a>    posterior_log_alpha.sel(condition<span class="op">=</span>non_cagemate_conds).mean(dim<span class="op">=</span><span class="st">"condition"</span>)</span>
+<span id="cb5-86"><a href="#cb5-86" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-87"><a href="#cb5-87" aria-hidden="true" tabindex="-1"></a>contrast_alpha_duration <span class="op">=</span> (</span>
+<span id="cb5-88"><a href="#cb5-88" aria-hidden="true" tabindex="-1"></a>    posterior_log_alpha.sel(condition<span class="op">=</span>conds_60_sec).mean(dim<span class="op">=</span><span class="st">"condition"</span>) <span class="op">-</span></span>
+<span id="cb5-89"><a href="#cb5-89" aria-hidden="true" tabindex="-1"></a>    posterior_log_alpha.sel(condition<span class="op">=</span>conds_10_sec).mean(dim<span class="op">=</span><span class="st">"condition"</span>)</span>
+<span id="cb5-90"><a href="#cb5-90" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-91"><a href="#cb5-91" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-92"><a href="#cb5-92" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Calculate Q0 Contrasts ---</span></span>
+<span id="cb5-93"><a href="#cb5-93" aria-hidden="true" tabindex="-1"></a>contrast_q0_familiarity <span class="op">=</span> (</span>
+<span id="cb5-94"><a href="#cb5-94" aria-hidden="true" tabindex="-1"></a>    posterior_log_q0.sel(condition<span class="op">=</span>cagemate_conds).mean(dim<span class="op">=</span><span class="st">"condition"</span>) <span class="op">-</span></span>
+<span id="cb5-95"><a href="#cb5-95" aria-hidden="true" tabindex="-1"></a>    posterior_log_q0.sel(condition<span class="op">=</span>non_cagemate_conds).mean(dim<span class="op">=</span><span class="st">"condition"</span>)</span>
+<span id="cb5-96"><a href="#cb5-96" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-97"><a href="#cb5-97" aria-hidden="true" tabindex="-1"></a>contrast_q0_duration <span class="op">=</span> (</span>
+<span id="cb5-98"><a href="#cb5-98" aria-hidden="true" tabindex="-1"></a>    posterior_log_q0.sel(condition<span class="op">=</span>conds_60_sec).mean(dim<span class="op">=</span><span class="st">"condition"</span>) <span class="op">-</span></span>
+<span id="cb5-99"><a href="#cb5-99" aria-hidden="true" tabindex="-1"></a>    posterior_log_q0.sel(condition<span class="op">=</span>conds_10_sec).mean(dim<span class="op">=</span><span class="st">"condition"</span>)</span>
+<span id="cb5-100"><a href="#cb5-100" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-101"><a href="#cb5-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-102"><a href="#cb5-102" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Format and Display Results ---</span></span>
+<span id="cb5-103"><a href="#cb5-103" aria-hidden="true" tabindex="-1"></a>alpha_contrasts <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb5-104"><a href="#cb5-104" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Familiarity (Cagemate - Non)'</span>: summarize_contrasts(contrast_alpha_familiarity),</span>
+<span id="cb5-105"><a href="#cb5-105" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Duration (60s - 10s)'</span>: summarize_contrasts(contrast_alpha_duration)</span>
+<span id="cb5-106"><a href="#cb5-106" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb5-107"><a href="#cb5-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-108"><a href="#cb5-108" aria-hidden="true" tabindex="-1"></a>q0_contrasts <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb5-109"><a href="#cb5-109" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Familiarity (Cagemate - Non)'</span>: summarize_contrasts(contrast_q0_familiarity),</span>
+<span id="cb5-110"><a href="#cb5-110" aria-hidden="true" tabindex="-1"></a>    <span class="st">'Duration (60s - 10s)'</span>: summarize_contrasts(contrast_q0_duration)</span>
+<span id="cb5-111"><a href="#cb5-111" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb5-112"><a href="#cb5-112" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-113"><a href="#cb5-113" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n\n</span><span class="st">--- Posterior Summary for Contrasts on log(alpha) ---"</span>)</span>
+<span id="cb5-114"><a href="#cb5-114" aria-hidden="true" tabindex="-1"></a>display(alpha_contrasts.T)</span>
+<span id="cb5-115"><a href="#cb5-115" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-116"><a href="#cb5-116" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">--- Posterior Summary for Contrasts on log(Q0) ---"</span>)</span>
+<span id="cb5-117"><a href="#cb5-117" aria-hidden="true" tabindex="-1"></a>display(q0_contrasts.T)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>--- Building and Fitting Bayesian Model with PyMC (this will take several minutes) ---</code></pre>
+<pre><code>--- Building and Fitting Bayesian Model with PyMC (this may take several minutes) ---</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
 <pre><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 4 jobs)
-NUTS: [sd_a, sd_b, a_coeffs, b_coeffs, a_pair_offset, b_pair_offset, sigma]
-Sampling 4 chains for 2_000 tune and 2_000 draw iterations (8_000 + 8_000 draws total) took 22 seconds.</code></pre>
+NUTS: [sd_alpha, z_alpha, sd_q0, z_q0, log_alpha, log_q0, sigma]
+Sampling 4 chains for 2_000 tune and 2_000 draw iterations (8_000 + 8_000 draws total) took 23 seconds.
+There was 1 divergence after tuning. Increase `target_accept` or reparameterize.</code></pre>
 </div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
---- Posterior Summary for Contrasts on Alpha ---
-                 lower  median  upper
-familiarity      0.745   1.441  2.134
-duration_linear -0.132   0.427  0.995
 
---- Posterior Summary for Contrasts on Q0 ---
-                 lower  median  upper
-familiarity     -2.553  -1.376 -0.209
-duration_linear -1.256  -0.354  0.560</code></pre>
+--- Posterior Summary for Contrasts on log(alpha) ---</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">quantile</th>
+<th data-quarto-table-cell-role="th">lower_ci</th>
+<th data-quarto-table-cell-role="th">median</th>
+<th data-quarto-table-cell-role="th">upper_ci</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">Familiarity (Cagemate - Non)</td>
+<td>0.244</td>
+<td>0.480</td>
+<td>0.723</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">Duration (60s - 10s)</td>
+<td>-0.076</td>
+<td>0.214</td>
+<td>0.496</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+--- Posterior Summary for Contrasts on log(Q0) ---</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th">quantile</th>
+<th data-quarto-table-cell-role="th">lower_ci</th>
+<th data-quarto-table-cell-role="th">median</th>
+<th data-quarto-table-cell-role="th">upper_ci</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">Familiarity (Cagemate - Non)</td>
+<td>-0.873</td>
+<td>-0.467</td>
+<td>-0.062</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">Duration (60s - 10s)</td>
+<td>-0.644</td>
+<td>-0.170</td>
+<td>0.305</td>
+</tr>
+</tbody>
+</table>
+
+</div>
 </div>
 </div>
 </section>
