@@ -31,13 +31,15 @@ A core feature of this repository is its demonstration of two distinct analytica
 
 ## Methodological Approach
 
-This project showcases a sophisticated computational modeling workflow for experimental data, highlighting the following skills:
+The analysis applies a computational modeling approach to quantify the value of social interaction by fitting a specialized behavioral-economic model to the experimental data.
 
-* **Nonlinear Demand Curve Modeling**: The core of both analyses is the application of the **Zero-Bounded Exponential (ZBEn) model**, a specialized function used to describe how consumption changes as a function of price. This involves custom model implementation in both R and Python.
-* **Dual Analytical Frameworks**:
-    * **Frequentist (Individual-Level) Analysis**: Demand models were fit for each subject individually using nonlinear least-squares. This approach allows for a direct assessment of between-subject variability and is common in the field.
-    * **Bayesian (Hierarchical) Analysis**: A custom nonlinear hierarchical model was implemented to analyze the entire dataset within a single framework. This approach is statistically powerful for small-N designs as it regularizes individual-level estimates and provides full posterior inference for all parameters and contrasts.
-* **Hypothesis Testing via Contrasts**: Hypotheses were tested by performing linear contrasts on the estimated model parameters ($\log(Q_0)$ and $\log(\alpha)$) in both the frequentist (manual calculation) and Bayesian (posterior distribution analysis) frameworks.
+* **Nonlinear Demand Curve Modeling**: The core of the analysis is the application of the **Zero-Bounded Exponential (ZBEn) model**, a nonlinear function that describes how consumption changes as a function of price.
+
+* **Dual Analytical Frameworks**: To ensure the robustness of the findings, the ZBEn model was fit using two distinct statistical frameworks:
+    * **Frequentist (Individual-Level) Analysis**: Demand models were fit for each subject individually using nonlinear least-squares. This approach allows for a direct assessment of between-subject variability.
+    * **Bayesian (Hierarchical) Analysis**: A custom nonlinear hierarchical model was implemented to analyze the entire dataset within a single framework. This approach is statistically powerful for small-N designs as it regularizes individual-level estimates through partial pooling and provides full posterior inference.
+
+* **Hypothesis Testing via Contrasts**: Hypotheses about the effects of the experimental manipulations were tested by performing linear contrasts on the key model parameters ($log(Q_0)$ and $log(\alpha)$) within both the frequentist and Bayesian frameworks.
 
 ---
 
