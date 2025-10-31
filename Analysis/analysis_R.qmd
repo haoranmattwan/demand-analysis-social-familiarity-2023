@@ -124,6 +124,7 @@ model_ready_data <- processed_demand_data |>
 This section replicates the first analytical approach from the paper, fitting the **Zero-Bounded Exponential (ZBEn) demand model** to each rat's data separately for all experimental conditions. This individual-level method allows for a direct examination of between-subject variability.
 
 The ZBEn model is a nonlinear function that describes how consumption of a reinforcer (here, social interaction rate) decreases as its price increases. By fitting this model, we can extract two key parameters that quantify the value of the reinforcer:
+
 - **$Q_{0}$ (Demand Intensity)**: The predicted level of consumption when the price is zero. A higher $Q_{0}$ indicates a higher overall demand.
 - **$\alpha$ (Elasticity)**: The rate at which consumption decreases as the price increases. A higher $\alpha$ indicates that demand is more sensitive to price (i.e., more elastic).
 
@@ -237,7 +238,7 @@ This approach offers several key advantages for this experimental design:
 -   **Simultaneous Analysis**: It analyzes all data at once, borrowing strength across individuals and conditions.
 -   **Accounts for Repeated Measures**: It formally models the non-independence of the data by treating each rat as a random effect. This is crucial for a repeated-measures design.
 -   **Improved Parameter Estimation**: By partially pooling information, it produces more stable and reliable parameter estimates, which is especially important given the small sample size (N=4 rats).
--   **Direct Probabilistic Inference**: It allows us to directly calculate the posterior distributions for our hypotheses (e.g., the effect of familiarity on demand), providing richer, more intuitive results than p-values alone.
+-   **Direct Probabilistic Inference**: It allows us to directly calculate the posterior distributions for our hypotheses (e.g., the effect of familiarity on demand), providing richer, more intuitive results than *p*-values alone.
 
 ```{r bayesian_analysis}
 # --- 3.1 Define and Fit the Bayesian Multilevel Model ---
@@ -277,7 +278,7 @@ brms_fit <- brm(
   formula = brms_demand_formula, 
   data = model_ready_data, 
   prior = brms_priors,
-  stanvars = custom_stan_functions, # <<< FIX IS HERE
+  stanvars = custom_stan_functions,
   iter = 4000, warmup = 2000, chains = 4, cores = 4,
   backend = "cmdstanr", 
   control = list(adapt_delta = 0.95, max_treedepth = 10),
@@ -285,8 +286,6 @@ brms_fit <- brm(
 )
 
 # --- 3.2 Analyze the Posterior Distributions for Key Contrasts ---
-
-# The posterior analysis code remains the same.
 
 # --- Analysis of the Alpha (Elasticity) Parameter ---
 cat("--- Posterior Summary for Contrasts on Alpha ---\n")
