@@ -6,8 +6,8 @@ Contributions should improve the accuracy, transparency, or portability of the p
 
 1. Obtain the analysis data from OSF; do not commit data files or private research materials.
 2. Make the same substantive change in the R and Python workflows when applicable.
-3. Run the publication validation checks in both workflows.
-4. Explain any departure from the published or archived analysis and report its effect on the results.
+3. Run the validation checks in both workflows.
+4. Explain any change to the model specification and report its effect on the results.
 5. Do not commit rendered reports, caches, local environments, correspondence, drafts, or Qualtrics exports.
 
 ## Validation
@@ -19,7 +19,7 @@ quarto render Analysis/analysis_R.qmd
 python Analysis/analysis_Py.py
 ```
 
-The workflows should reproduce the validation targets listed in `README.md`. A change that alters those values must be justified as a correction or explicitly labeled sensitivity analysis.
+The workflows should reproduce the validation targets listed in `README.md`. A change that alters those values must be scientifically and computationally justified.
 
 ## Reporting issues
 

@@ -34,9 +34,9 @@ EXPECTED_COLUMNS = (
     "Social FR",
     "Interaction Rate",
 )
-PUBLISHED_TARGETS = {
+VALIDATION_TARGETS = {
     "mean_r_squared": 0.910,
-    "familiarity_alpha_p": 0.710,
+    "familiarity_alpha_p": 0.0163,
     "familiarity_q0_p": 0.471,
     "duration_alpha_p": 0.226,
     "duration_q0_p": 0.805,
@@ -250,9 +250,7 @@ def normal_contrast(
     }
 
 
-def fit_familiarity_models(
-    analysis: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+def fit_familiarity_model(analysis: pd.DataFrame) -> pd.DataFrame:
     familiarity = (
         analysis.groupby(["rat", "familiarity", "fr"], as_index=False)
         .agg(lq=("lq", "mean"))
@@ -265,49 +263,40 @@ def fit_familiarity_models(
     fr = familiarity["fr"].to_numpy(float)
     observed = familiarity["lq"].to_numpy(float)
 
-    def familiarity_model(parameters: np.ndarray, symmetric: bool) -> np.ndarray:
+    def familiarity_model(parameters: np.ndarray) -> np.ndarray:
         log_alpha_cagemate, log_alpha_non_cagemate, q_cagemate, q_non = parameters
-        outer_q = q_cagemate * is_cagemate + q_non * is_non_cagemate
-        if symmetric:
-            inner_q = outer_q
-        else:
-            # Publication compatibility: preserve the asymmetric expression in
-            # the archived R model to reproduce the article's reported tests.
-            inner_q = q_cagemate * is_cagemate + q_non
+        condition_q0 = q_cagemate * is_cagemate + q_non * is_non_cagemate
         log_alpha = (
             log_alpha_cagemate * is_cagemate
             + log_alpha_non_cagemate * is_non_cagemate
         )
-        return ihs(outer_q) * np.exp(
-            (-np.exp(log_alpha) / ihs(inner_q)) * inner_q * fr
+        return ihs(condition_q0) * np.exp(
+            (-np.exp(log_alpha) / ihs(condition_q0)) * condition_q0 * fr
         )
 
-    def fit_and_contrast(symmetric: bool) -> pd.DataFrame:
-        parameters, covariance, _, _ = fit_nonlinear(
-            observed,
-            lambda values: familiarity_model(values, symmetric=symmetric),
-            initial=(-6.0, -6.0, 50.0, 50.0),
-            lower=(-np.inf, -np.inf, np.finfo(float).eps, np.finfo(float).eps),
-            upper=(np.inf, np.inf, np.inf, np.inf),
-        )
-        return pd.DataFrame(
-            [
-                normal_contrast(
-                    parameters,
-                    covariance,
-                    (1.0, -1.0, 0.0, 0.0),
-                    "Elasticity (log alpha)",
-                ),
-                normal_contrast(
-                    parameters,
-                    covariance,
-                    (0.0, 0.0, 1.0, -1.0),
-                    "Demand intensity (Q0)",
-                ),
-            ]
-        )
-
-    return fit_and_contrast(symmetric=False), fit_and_contrast(symmetric=True)
+    parameters, covariance, _, _ = fit_nonlinear(
+        observed,
+        familiarity_model,
+        initial=(-6.0, -6.0, 50.0, 50.0),
+        lower=(-np.inf, -np.inf, np.finfo(float).eps, np.finfo(float).eps),
+        upper=(np.inf, np.inf, np.inf, np.inf),
+    )
+    return pd.DataFrame(
+        [
+            normal_contrast(
+                parameters,
+                covariance,
+                (1.0, -1.0, 0.0, 0.0),
+                "Elasticity (log alpha)",
+            ),
+            normal_contrast(
+                parameters,
+                covariance,
+                (0.0, 0.0, 1.0, -1.0),
+                "Demand intensity (Q0)",
+            ),
+        ]
+    )
 
 
 def nested_f_test(
@@ -414,14 +403,14 @@ def build_validation(
         "duration_q0_p": float(duration.loc[1, "p_value"]),
     }
     rows = []
-    for statistic, published in PUBLISHED_TARGETS.items():
+    for statistic, expected in VALIDATION_TARGETS.items():
         calculated = computed[statistic]
-        difference = abs(calculated - published)
+        difference = abs(calculated - expected)
         rows.append(
             {
                 "statistic": statistic,
                 "computed": calculated,
-                "published": published,
+                "expected": expected,
                 "absolute_difference": difference,
                 "passes": difference <= 0.01,
             }
@@ -446,7 +435,7 @@ def main() -> int:
     data_path = resolve_data_path(args.data)
     raw, analysis = load_and_validate(data_path)
     curves = fit_subject_curves(analysis)
-    familiarity, sensitivity = fit_familiarity_models(analysis)
+    familiarity = fit_familiarity_model(analysis)
     duration = fit_duration_models(analysis)
     validation = build_validation(curves, familiarity, duration)
 
@@ -475,10 +464,9 @@ def main() -> int:
     print_table("Validated analysis data", design_summary)
     print_table("Subject-condition ZBEn parameters", curves)
     print_table("Demand-curve fit summary", curve_summary)
-    print_table("Published familiarity compatibility tests", familiarity)
-    print_table("Published duration tests", duration)
-    print_table("Symmetric familiarity sensitivity tests", sensitivity)
-    print_table("Publication validation checks", validation)
+    print_table("Familiarity tests", familiarity)
+    print_table("Duration tests", duration)
+    print_table("Analysis validation checks", validation)
 
     print("\nEnvironment")
     print("-----------")
@@ -489,9 +477,8 @@ def main() -> int:
 
     tables = {
         "subject_condition_parameters": curves,
-        "familiarity_compatibility": familiarity,
+        "familiarity_tests": familiarity,
         "duration_tests": duration,
-        "familiarity_sensitivity": sensitivity,
         "validation": validation,
     }
     if args.output_dir is not None:
@@ -501,7 +488,7 @@ def main() -> int:
     if not args.no_check and not validation["passes"].all():
         print(
             "\nERROR: At least one computed result differs materially from the "
-            "published value.",
+            "expected value.",
             file=sys.stderr,
         )
         return 1

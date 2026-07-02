@@ -30,6 +30,7 @@ renv/staging/
 packrat/
 *.Rcheck/
 /*.tar.gz
+RachelThesis.Rproj
 
 # Python and Jupyter
 .venv/
@@ -106,6 +107,6 @@ __pycache__/
 /Invoices/
 /invoices/
 
-# Local publication and legacy-analysis archive
+# Local publication and analysis working files
 /Code/
 /fpsyg-14-1158365.pdf

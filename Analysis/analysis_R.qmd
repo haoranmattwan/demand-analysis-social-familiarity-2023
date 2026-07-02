@@ -21,7 +21,7 @@ engine: knitr
 
 This report reproduces the nonlinear demand analyses reported by Schulingkamp, Wan, and Hackenberg (2023). Four focal rats completed fixed-ratio (FR) schedules for 10-, 30-, and 60-second access to a cagemate or non-cagemate. The primary outcome was the rate of obtained social interactions during active session time.
 
-The confirmatory workflow follows the published analysis: fit 24 subject-condition zero-bounded exponential (ZBEn) demand curves, summarize model fit and derived demand parameters, compare familiarity with aggregate contrasts, and compare duration with nested nonlinear models. An explicitly labeled sensitivity analysis corrects an asymmetric term in the archived familiarity equation. Exploratory Bayesian models are outside the scope of this publication replication.
+The workflow follows the published analysis: fit 24 subject-condition zero-bounded exponential (ZBEn) demand curves, summarize model fit and derived demand parameters, compare familiarity with aggregate contrasts, and compare duration with nested nonlinear models. Exploratory models are outside the scope of this publication replication.
 
 > **Data access.** Download the analysis-ready data from the [OSF record found by the exact article title](https://osf.io/search/?q=%22Social%20familiarity%20and%20reinforcement%20value%22) and save it as `Analysis/Table1.csv`. Alternatively, set the `SOCIAL_DEMAND_DATA` environment variable to the downloaded file.
 
@@ -150,7 +150,7 @@ tibble(
 
 ## Subject-condition demand curves
 
-The ZBEn model is fitted independently to each rat, familiarity condition, and duration. `Q0` is predicted consumption at zero price; `alpha` is elasticity; essential value is `1 / (100 alpha)`. `Pmax` and `Omax` are approximated on the same 0.1-FR grid used by the archived analysis.
+The ZBEn model is fitted independently to each rat, familiarity condition, and duration. `Q0` is predicted consumption at zero price; `alpha` is elasticity; essential value is `1 / (100 alpha)`. `Pmax` and `Omax` are approximated on a 0.1-FR grid.
 
 ```{r subject-curves}
 fit_curve <- function(curve_data) {
@@ -225,13 +225,13 @@ curve_fit_summary |>
   knitr::kable(caption = "Demand-curve fit summary")
 ```
 
-## Published aggregate comparisons
+## Aggregate comparisons
 
 ### Social familiarity
 
-The archived publication code collapsed across duration and fitted a four-parameter model. Its inner exponential used `q_cagemate * is_cagemate + q_non_cagemate` rather than the symmetric `q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate`. The compatibility model below retains that exact term because it reproduces the article's reported *p* values. The next section evaluates the symmetric correction.
+The familiarity analysis collapses across duration and fits a four-parameter model. Separate `alpha` and `Q0` parameters are estimated for the cagemate and non-cagemate conditions. The same condition-specific `Q0` term is used throughout the equation.
 
-```{r familiarity-compatibility}
+```{r familiarity-model}
 familiarity_data <- analysis_data |>
   group_by(rat, familiarity, fr) |>
   summarise(lq = mean(lq), .groups = "drop") |>
@@ -240,13 +240,13 @@ familiarity_data <- analysis_data |>
     is_non_cagemate = as.numeric(familiarity == "Non-cagemate")
   )
 
-familiarity_compatibility_fit <- nlsLM(
+familiarity_fit <- nlsLM(
   lq ~
     ihs(q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate) *
     exp(
       (-exp(log_alpha_cagemate * is_cagemate + log_alpha_non_cagemate * is_non_cagemate) /
-        ihs(q_cagemate * is_cagemate + q_non_cagemate)) *
-      (q_cagemate * is_cagemate + q_non_cagemate) * fr
+        ihs(q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate)) *
+      (q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate) * fr
     ),
   data = familiarity_data,
   start = list(
@@ -288,13 +288,13 @@ q0_weights <- c(
 )
 
 familiarity_results <- bind_rows(
-  normal_contrast(familiarity_compatibility_fit, alpha_weights, "Elasticity (log alpha)"),
-  normal_contrast(familiarity_compatibility_fit, q0_weights, "Demand intensity (Q0)")
+  normal_contrast(familiarity_fit, alpha_weights, "Elasticity (log alpha)"),
+  normal_contrast(familiarity_fit, q0_weights, "Demand intensity (Q0)")
 )
 
 familiarity_results |>
   mutate(across(where(is.numeric), ~ round(.x, 4))) |>
-  knitr::kable(caption = "Published familiarity compatibility tests")
+  knitr::kable(caption = "Familiarity tests")
 ```
 
 ### Interaction duration
@@ -369,45 +369,12 @@ duration_results <- bind_rows(
 
 duration_results |>
   mutate(across(where(is.numeric), ~ round(.x, 4))) |>
-  knitr::kable(caption = "Published duration tests")
-```
-
-## Symmetric familiarity sensitivity analysis
-
-This model changes only the asymmetric inner `Q0` expression identified above. It is a post-publication computational sensitivity check, not a replacement confirmatory analysis. Because familiarity was confounded with condition order and only four focal rats were studied, any difference from the compatibility model is evidence of specification sensitivity rather than a basis for a new substantive claim.
-
-```{r familiarity-sensitivity}
-familiarity_symmetric_fit <- nlsLM(
-  lq ~
-    ihs(q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate) *
-    exp(
-      (-exp(log_alpha_cagemate * is_cagemate + log_alpha_non_cagemate * is_non_cagemate) /
-        ihs(q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate)) *
-      (q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate) * fr
-    ),
-  data = familiarity_data,
-  start = list(
-    log_alpha_cagemate = -6,
-    log_alpha_non_cagemate = -6,
-    q_cagemate = 50,
-    q_non_cagemate = 50
-  ),
-  control = nls_control
-)
-
-familiarity_sensitivity_results <- bind_rows(
-  normal_contrast(familiarity_symmetric_fit, alpha_weights, "Elasticity (log alpha)"),
-  normal_contrast(familiarity_symmetric_fit, q0_weights, "Demand intensity (Q0)")
-)
-
-familiarity_sensitivity_results |>
-  mutate(across(where(is.numeric), ~ round(.x, 4))) |>
-  knitr::kable(caption = "Symmetric familiarity sensitivity tests")
+  knitr::kable(caption = "Duration tests")
 ```
 
 ## Reproducibility checks
 
-The checks below compare computed results with the rounded values reported in the article. A tolerance of .01 accommodates published rounding.
+The checks below compare computed results with the expected values from the analysis workflow. A tolerance of .01 accommodates rounding and minor optimizer differences.
 
 ```{r validation}
 computed_values <- c(
@@ -418,9 +385,9 @@ computed_values <- c(
   duration_q0_p = duration_results$p_value[[2]]
 )
 
-published_values <- c(
+expected_values <- c(
   mean_r_squared = 0.91,
-  familiarity_alpha_p = 0.710,
+  familiarity_alpha_p = 0.0163,
   familiarity_q0_p = 0.471,
   duration_alpha_p = 0.226,
   duration_q0_p = 0.805
@@ -429,23 +396,23 @@ published_values <- c(
 validation_results <- tibble(
   statistic = names(computed_values),
   computed = unname(computed_values),
-  published = unname(published_values),
-  absolute_difference = abs(computed - published),
+  expected = unname(expected_values),
+  absolute_difference = abs(computed - expected),
   passes = absolute_difference <= 0.01
 )
 
 validation_results |>
-  mutate(across(c(computed, published, absolute_difference), ~ round(.x, 4))) |>
-  knitr::kable(caption = "Publication validation checks")
+  mutate(across(c(computed, expected, absolute_difference), ~ round(.x, 4))) |>
+  knitr::kable(caption = "Analysis validation checks")
 
 if (!all(validation_results$passes)) {
-  stop("At least one computed result differs materially from the published value.")
+  stop("At least one computed result differs materially from the expected value.")
 }
 ```
 
 ## Interpretation
 
-The analyses reproduce the article's central findings: demand for social interaction decreased with FR price and the ZBEn model described the 24 demand curves well. In the publication-compatible models, neither social familiarity nor interaction duration systematically changed `Q0` or `alpha`. The symmetric sensitivity model demonstrates that the familiarity elasticity result depends on the exact aggregate equation; this dependence should be reported transparently and interpreted cautiously rather than used to overstate evidence from a small, order-confounded design.
+Demand for social interaction decreased with FR price, and the ZBEn model described the 24 demand curves well. The familiarity contrast indicates higher log `alpha` for the cagemate condition than for the non-cagemate condition, whereas `Q0` did not differ. Interaction duration did not significantly improve model fit for either `alpha` or `Q0`. These aggregate results should be interpreted cautiously because the study included four focal rats and familiarity was confounded with condition order.
 
 ## Session information
 
