@@ -1,323 +1,454 @@
 ---
-title: "A Behavioral-Economic Demand Analysis of Social Reinforcement"
-subtitle: "Replication of Schulingkamp et al. (2023), Frontiers in Psychology"
-author: "Haoran (Matt) Wan"
-date: "today"
-format: 
+title: "Social Familiarity and Reinforcement Value"
+subtitle: "Publication-aligned analysis in R"
+author: "Haoran Wan"
+date: last-modified
+format:
   html:
     toc: true
+    toc-depth: 3
     code-fold: false
-    self-contained: true
-    theme: cosmo
-    mainfont: "Garamond"
+    code-tools: true
+    embed-resources: true
 execute:
+  echo: true
   warning: false
   message: false
 engine: knitr
 ---
 
-## Project Objective
+## Purpose and scientific scope
 
-This document provides the complete R code to replicate the analyses from the publication:
+This report reproduces the nonlinear demand analyses reported by Schulingkamp, Wan, and Hackenberg (2023). Four focal rats completed fixed-ratio (FR) schedules for 10-, 30-, and 60-second access to a cagemate or non-cagemate. The primary outcome was the rate of obtained social interactions during active session time.
 
-> Schulingkamp, R., Wan, H., & Hackenberg, T. D. (2023). Social familiarity and reinforcement value: a behavioral-economic analysis of demand for social interaction with cagemate and non-cagemate female rats. *Frontiers in Psychology*, *14*, 1158365. https://doi.org/10.3389/fpsyg.2023.1158365
+The confirmatory workflow follows the published analysis: fit 24 subject-condition zero-bounded exponential (ZBEn) demand curves, summarize model fit and derived demand parameters, compare familiarity with aggregate contrasts, and compare duration with nested nonlinear models. An explicitly labeled sensitivity analysis corrects an asymmetric term in the archived familiarity equation. Exploratory Bayesian models are outside the scope of this publication replication.
 
-The study's goal is to quantify the reinforcing value of social interaction in rats using a behavioral-economic demand analysis. Specifically, it tests how this value is affected by **social familiarity** (cagemate vs. non-cagemate) and **reinforcer magnitude** (duration of interaction).
+> **Data access.** Download the analysis-ready data from the [OSF record found by the exact article title](https://osf.io/search/?q=%22Social%20familiarity%20and%20reinforcement%20value%22) and save it as `Analysis/Table1.csv`. Alternatively, set the `SOCIAL_DEMAND_DATA` environment variable to the downloaded file.
 
-This document demonstrates two distinct analytical approaches to fitting the **Zero-Bounded Exponential (ZBEn) demand model** to the data:
+## Setup
 
-1.  A **frequentist, individual-level analysis** using nonlinear least-squares (`nlsLM`).
-2.  A **Bayesian multilevel analysis** using a custom nonlinear model in `brms`, which is better suited for handling repeated measures from a small sample.
+```{r setup}
+required_packages <- c("dplyr", "knitr", "minpack.lm", "readr", "tidyr")
+missing_packages <- required_packages[
+  !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
+]
 
-The data for this study is available in the Supplementary Material of the original publication at the [publisher's website](https://www.frontiersin.org/articles/10.3389/fpsyg.2023.1158365/full#supplementary-material).
-
-## Analysis Workflow
-
-1.  **Setup & Data Processing**: Loads R packages and the raw dataset, then processes it into an analysis-ready format. This includes calculating response rates and creating dummy variables for the models.
-2.  **Frequentist Analysis (Individual-Level)**: Fits the ZBEn demand model to each rat and condition separately using `nlsLM`. Extracts the key model parameters ($Q_{0}$ and $\alpha$) and uses linear contrasts to test for systematic differences across conditions.
-3.  **Bayesian Analysis (Multilevel)**: Fits a single, comprehensive Bayesian nonlinear mixed-effects model using `brms`. This approach models all data simultaneously, treating individual rats as random effects to produce more robust parameter estimates.
-4.  **Parameter Comparison**: Compares the parameter estimates derived from both the frequentist and Bayesian approaches.
-
-```{r setup_and_process}
-# --- 1. SETUP: LOAD PACKAGES AND PROCESS DATA ---
-
-# This section prepares the R environment, loads the raw dataset, and transforms
-# it into an analysis-ready format for both the frequentist and Bayesian models.
-
-# --- 1.1 Load R Packages ---
-library(minpack.lm) # For robust non-linear least squares regression (nlsLM)
-library(multcomp)   # For linear hypothesis testing (contrast tests)
-library(brms)       # For Bayesian Regression Models using Stan
-library(tidybayes)  # For tidying and visualizing Bayesian model output
-library(readr)      # For fast CSV file reading
-library(dplyr)      # For data manipulation and wrangling
-library(tidyr)      # For tidying data
-
-
-# --- 1.2 Helper Functions for ZBEn Model ---
-
-# These functions are used for the transformations required by the Zero-Bounded
-# Exponential (ZBEn) demand model (Gilroy et al., 2021).
-
-#' @title Inverse Hyperbolic Sine (IHS) Transformation
-#' @description A log-like transformation that is defined at zero.
-transform_IHS <- function(x) { log10(0.5 * x + sqrt(0.25 * (x^2) + 1)) }
-
-#' @title Anti-Log Transformation for IHS
-#' @description The inverse of the IHS transformation.
-inverse_IHS <- function(y) { (10^(2 * y) - 1) / (10^y) }
-
-#' @title Essential Value Calculation
-#' @description Calculates the essential value (EV) parameter from elasticity.
-calculate_EV <- function(alpha) { 1 / (100 * alpha) }
-
-
-# --- 1.3 Load and Process Data ---
-
-raw_demand_data <- read_csv("Table1.csv")
-
-# Process the raw data into an analysis-ready format
-processed_demand_data <- raw_demand_data |>
-  mutate(
-    # Apply the IHS transform to the interaction rate for the ZBEn model
-    lq = transform_IHS(`Interaction Rate`),
-    # Create clear factor labels for familiarity and condition
-    duration_label = case_when(
-      `Social Duration` == "10 Sec" ~ "10_Sec",
-      `Social Duration` == "30 Sec" ~ "30_Sec",
-      `Social Duration` == "60 Sec" ~ "60_Sec"
-    )
-  ) |>
-  # Average data points at the same price (fr) within each experimental condition
-  group_by(Rat, `Social Familiarity`, duration_label, `Social FR`) |>
-  summarise(
-    `Interaction Rate` = mean(`Interaction Rate`),
-    lq = mean(lq),
-    .groups = 'drop'
-  ) |>
-  # Create a unique ID for each demand curve (rat x familiarity x duration)
-  mutate(curve_id = group_indices(across(c(Rat, `Social Familiarity`, duration_label))))
-
-# Create dummy variables for use as predictors in the regression models
-model_ready_data <- processed_demand_data |>
-  # Create a single interaction term for easier dummy coding
-  tidyr::unite("condition", `Social Familiarity`:duration_label, remove = FALSE) |>
-  fastDummies::dummy_cols(select_columns = c("Social Familiarity", "condition")) |>
-  # Rename dummy variables to be descriptive and valid R variable names
-  rename(
-    is_cagemate = `Social Familiarity_Cagemate`,
-    is_non_cagemate = `Social Familiarity_Non-cagemate`,
-    cagemate_10s = `condition_Cagemate_10_Sec`,
-    cagemate_30s = `condition_Cagemate_30_Sec`,
-    cagemate_60s = `condition_Cagemate_60_Sec`,
-    non_cagemate_10s = `condition_Non-cagemate_10_Sec`,
-    non_cagemate_30s = `condition_Non-cagemate_30_Sec`,
-    non_cagemate_60s = `condition_Non-cagemate_60_Sec`,
-    FR = `Social FR`
+if (length(missing_packages) > 0L) {
+  stop(
+    "Install missing packages before rendering: ",
+    paste(missing_packages, collapse = ", ")
   )
-```
-
----
-
-## 2. Frequentist Analysis (Individual-Level)
-
-This section replicates the first analytical approach from the paper, fitting the **Zero-Bounded Exponential (ZBEn) demand model** to each rat's data separately for all experimental conditions. This individual-level method allows for a direct examination of between-subject variability.
-
-The ZBEn model is a nonlinear function that describes how consumption of a reinforcer (here, social interaction rate) decreases as its price increases. By fitting this model, we can extract two key parameters that quantify the value of the reinforcer:
-
-- **$Q_{0}$ (Demand Intensity)**: The predicted level of consumption when the price is zero. A higher $Q_{0}$ indicates a higher overall demand.
-- **$\alpha$ (Elasticity)**: The rate at which consumption decreases as the price increases. A higher $\alpha$ indicates that demand is more sensitive to price (i.e., more elastic).
-
-After fitting the models, we perform linear contrasts on the estimated parameters to test the primary hypotheses: whether social familiarity or interaction duration systematically affected demand intensity ($Q_{0}$) or elasticity ($\alpha$).
-
-```{r frequentist_analysis}
-# --- 2.1 Fit ZBEn Model for Each Individual Rat ---
-
-# We will loop through each of the 4 rats, fitting a single complex nonlinear
-# model to each one's complete dataset. This model uses dummy variables to
-# simultaneously estimate a unique Q0 and alpha parameter for each of the 6
-# experimental conditions (2 familiarity x 3 duration).
-
-# Initialize lists to store the results from each rat
-individual_parameter_list <- list()
-individual_contrast_list <- list()
-
-for (rat_id in 1:4) {
-  
-  # Filter data for the current rat
-  rat_data <- filter(model_ready_data, Rat == rat_id)
-  
-  # Fit the Zero-Bounded Exponential (ZBEn) model using nlsLM
-  model_fit <- nlsLM(
-    # The formula specifies the ZBEn model in its transformed (IHS) space.
-    # It estimates separate 'q' (Q0) and 'a' (alpha) parameters for each
-    # of the 6 conditions using the dummy variables created earlier.
-    lq ~ transform_IHS(
-      cagemate_10s * q_c10 + cagemate_30s * q_c30 + cagemate_60s * q_c60 +
-      non_cagemate_10s * q_nc10 + non_cagemate_30s * q_nc30 + non_cagemate_60s * q_nc60
-    ) * exp(
-      (-exp(
-        cagemate_10s * a_c10 + cagemate_30s * a_c30 + cagemate_60s * a_c60 +
-        non_cagemate_10s * a_nc10 + non_cagemate_30s * a_nc30 + non_cagemate_60s * a_nc60
-      ) / transform_IHS(
-        cagemate_10s * q_c10 + cagemate_30s * q_c30 + cagemate_60s * q_c60 +
-        non_cagemate_10s * q_nc10 + non_cagemate_30s * q_nc30 + non_cagemate_60s * q_nc60
-      )) * (
-        cagemate_10s * q_c10 + cagemate_30s * q_c30 + cagemate_60s * q_c60 +
-        non_cagemate_10s * q_nc10 + non_cagemate_30s * q_nc30 + non_cagemate_60s * q_nc60
-      ) * FR
-    ),
-    data = rat_data,
-    start = list(
-      a_c10=-6, a_c30=-6, a_c60=-6, a_nc10=-6, a_nc30=-6, a_nc60=-6,
-      q_c10=50, q_c30=50, q_c60=50, q_nc10=50, q_nc30=50, q_nc60=50
-    ),
-    control = list(maxiter = 1024)
-  )
-  
-  # Store the tidy parameter estimates
-  params <- broom::tidy(model_fit)
-  params$rat_id <- rat_id
-  individual_parameter_list[[rat_id]] <- params
-  
-  # --- 2.2 Perform Linear Contrasts on Model Parameters ---
-  
-  # Define a contrast matrix to test the main effect of familiarity on alpha and Q0.
-  # This averages across the three duration conditions.
-  contrast_matrix <- matrix(c(
-    # Row 1: (Cagemate alphas) - (Non-cagemate alphas)
-    1, 1, 1, -1, -1, -1, 0, 0, 0, 0, 0, 0,
-    # Row 2: (Cagemate Q0s) - (Non-cagemate Q0s)
-    0, 0, 0, 0, 0, 0, 1, 1, 1, -1, -1, -1
-  ), nrow = 2, byrow = TRUE)
-  rownames(contrast_matrix) <- c("alpha", "Q0")
-  
-  # Execute the general linear hypothesis test and store tidy results
-  contrasts <- broom::tidy(summary(glht(model_fit, linfct = contrast_matrix)))
-  contrasts$rat_id <- rat_id
-  individual_contrast_list[[rat_id]] <- contrasts
 }
 
-# --- 2.3 Format and Display Results ---
+library(dplyr)
+library(minpack.lm)
+library(readr)
+library(tidyr)
 
-# Combine the parameter estimates from all rats into a single dataframe
-individual_parameter_estimates <- bind_rows(individual_parameter_list) |>
-  mutate(
-    parameter = if_else(grepl("^a_", term), "alpha", "Q0"),
-    Familiarity = if_else(grepl("_c", term), "Cagemate", "Non-cagemate"),
-    Duration = case_when(
-      grepl("10$", term) ~ "10 Sec",
-      grepl("30$", term) ~ "30 Sec",
-      grepl("60$", term) ~ "60 Sec"
-    )
-  ) |>
-  select(rat_id, Familiarity, Duration, parameter, estimate, std.error)
+options(digits = 4, scipen = 4)
+set.seed(20230122)
 
-# Combine the contrast results from all rats
-individual_contrast_results <- bind_rows(individual_contrast_list) |>
-  rename(parameter = contrast) |>
-  mutate(contrast = "Cagemate vs. Non-cagemate") |>
-  select(rat_id, parameter, contrast, estimate, std.error, adj.p.value)
+ihs <- function(x) {
+  log10(0.5 * x + sqrt(0.25 * x^2 + 1))
+}
 
-# Display the formatted results tables
-cat("--- Estimated ZBEn Parameters (Individual Level) ---\n")
-print(individual_parameter_estimates, n = 48)
+inverse_ihs <- function(y) {
+  (10^(2 * y) - 1) / 10^y
+}
 
-cat("\n--- Linear Contrast Results ---\n")
-print(individual_contrast_results)
+zben <- function(fr, log_alpha, q0) {
+  ihs_q0 <- ihs(q0)
+  ihs_q0 * exp((-exp(log_alpha) / ihs_q0) * q0 * fr)
+}
+
+essential_value <- function(alpha) {
+  1 / (100 * alpha)
+}
+
+nls_control <- nls.lm.control(maxiter = 1024, maxfev = 100000)
 ```
 
----
+## Data import and validation
 
-## 3. Bayesian Analysis (Multilevel)
+The OSF file is kept outside version control. The loader checks an explicit environment variable first and then the two paths expected when rendering from the repository root or the `Analysis` directory.
 
-This section presents a more robust and statistically powerful alternative to the individual-level analysis. We fit a single **Bayesian nonlinear multilevel model** to the entire dataset using the `brms` package.
+```{r data-import}
+data_candidates <- unique(c(
+  Sys.getenv("SOCIAL_DEMAND_DATA", unset = NA_character_),
+  "Analysis/Table1.csv",
+  "Table1.csv"
+))
+data_candidates <- data_candidates[!is.na(data_candidates) & nzchar(data_candidates)]
+existing_data <- data_candidates[file.exists(data_candidates)]
 
-This approach offers several key advantages for this experimental design:
+if (length(existing_data) == 0L) {
+  stop(
+    "Data not found. Download Table1.csv from OSF and place it in Analysis/, ",
+    "or set SOCIAL_DEMAND_DATA to the downloaded file."
+  )
+}
 
--   **Simultaneous Analysis**: It analyzes all data at once, borrowing strength across individuals and conditions.
--   **Accounts for Repeated Measures**: It formally models the non-independence of the data by treating each rat as a random effect. This is crucial for a repeated-measures design.
--   **Improved Parameter Estimation**: By partially pooling information, it produces more stable and reliable parameter estimates, which is especially important given the small sample size (N=4 rats).
--   **Direct Probabilistic Inference**: It allows us to directly calculate the posterior distributions for our hypotheses (e.g., the effect of familiarity on demand), providing richer, more intuitive results than *p*-values alone.
-
-```{r bayesian_analysis}
-# --- 3.1 Define and Fit the Bayesian Multilevel Model ---
-
-# Define the Stan code for our custom IHS transformation function.
-# This code will be inserted into the 'functions' block of the Stan program.
-stan_function_code <- "
-  real transform_IHS(real x) {
-    return log10(0.5 * x + sqrt(0.25 * (x^2) + 1));
-  }
-"
-
-# Create a 'stanvar' object to pass the function to brms.
-custom_stan_functions <- stanvar(scode = stan_function_code, block = "functions")
-
-# Define the brms model formula.
-brms_demand_formula <- bf(
-  lq ~ transform_IHS(exp(b)) * exp((-exp(a) / transform_IHS(exp(b))) * exp(b) * FR),
-  a ~ 0 + cagemate_10s + cagemate_30s + cagemate_60s + 
-          non_cagemate_10s + non_cagemate_30s + non_cagemate_60s + (1 | Rat),
-  b ~ 0 + cagemate_10s + cagemate_30s + cagemate_60s + 
-          non_cagemate_10s + non_cagemate_30s + non_cagemate_60s + (1 | Rat),
-  nl = TRUE
+data_path <- existing_data[[1L]]
+expected_columns <- c(
+  "Rat", "Social Familiarity", "Social Duration", "Social FR",
+  "Interaction Rate"
 )
 
-# Priors
-brms_priors <- c(
-  prior(cauchy(0, 2.5), class = "sigma"),
-  prior(cauchy(-6, 2.5), class = "b", nlpar = "a"),
-  prior(cauchy(0, 2.5), class = "sd", nlpar = "a"),
-  prior(cauchy(4, 2.5), class = "b", nlpar = "b"),
-  prior(cauchy(0, 2.5), class = "sd", nlpar = "b")
+raw_data <- read_csv(data_path, show_col_types = FALSE)
+missing_columns <- setdiff(expected_columns, names(raw_data))
+
+if (length(missing_columns) > 0L) {
+  stop("Missing required columns: ", paste(missing_columns, collapse = ", "))
+}
+
+if (anyNA(raw_data[expected_columns])) {
+  stop("Required analysis fields contain missing values.")
+}
+
+if (any(raw_data$`Interaction Rate` < 0) || any(raw_data$`Social FR` <= 0)) {
+  stop("Interaction rates must be nonnegative and FR prices must be positive.")
+}
+
+observed_design <- list(
+  rats = sort(unique(raw_data$Rat)),
+  familiarity = sort(unique(raw_data$`Social Familiarity`)),
+  duration = sort(unique(raw_data$`Social Duration`))
 )
 
-# Fit the Bayesian model, now including the 'stanvars' argument.
-brms_fit <- brm(
-  formula = brms_demand_formula, 
-  data = model_ready_data, 
-  prior = brms_priors,
-  stanvars = custom_stan_functions,
-  iter = 4000, warmup = 2000, chains = 4, cores = 4,
-  backend = "cmdstanr", 
-  control = list(adapt_delta = 0.95, max_treedepth = 10),
-  silent = 2, refresh = 0
-)
+if (length(observed_design$rats) != 4L ||
+    !identical(observed_design$familiarity, c("Cagemate", "Non-cagemate")) ||
+    !identical(observed_design$duration, c("10 Sec", "30 Sec", "60 Sec"))) {
+  stop("The data do not contain the expected 4 x 2 x 3 study design.")
+}
 
-# --- 3.2 Analyze the Posterior Distributions for Key Contrasts ---
-
-# --- Analysis of the Alpha (Elasticity) Parameter ---
-cat("--- Posterior Summary for Contrasts on Alpha ---\n")
-posterior_alpha_contrasts <- brms_fit |>
-  spread_draws(`b_a_.*`, regex = TRUE) |>
-  mutate(
-    familiarity_effect = (b_a_cagemate_10s + b_a_cagemate_30s + b_a_cagemate_60s) - 
-                         (b_a_non_cagemate_10s + b_a_non_cagemate_30s + b_a_non_cagemate_60s),
-    duration_linear_trend = ((-1)*b_a_cagemate_10s + 1*b_a_cagemate_60s) + 
-                            ((-1)*b_a_non_cagemate_10s + 1*b_a_non_cagemate_60s)
+analysis_data <- raw_data |>
+  transmute(
+    rat = Rat,
+    familiarity = `Social Familiarity`,
+    duration = `Social Duration`,
+    fr = `Social FR`,
+    interaction_rate = `Interaction Rate`,
+    lq = ihs(`Interaction Rate`)
   ) |>
-  select(familiarity_effect, duration_linear_trend) |>
-  pivot_longer(everything(), names_to = "contrast", values_to = "value") |>
-  group_by(contrast) |>
-  median_qi()
+  group_by(rat, familiarity, duration, fr) |>
+  summarise(
+    interaction_rate = mean(interaction_rate),
+    lq = mean(lq),
+    sessions = n(),
+    .groups = "drop"
+  )
 
-print(posterior_alpha_contrasts)
+tibble(
+  source = normalizePath(data_path),
+  session_rows = nrow(raw_data),
+  aggregated_rows = nrow(analysis_data),
+  rats = n_distinct(analysis_data$rat),
+  curves = n_distinct(interaction(analysis_data$rat, analysis_data$familiarity, analysis_data$duration))
+) |>
+  knitr::kable(caption = "Validated analysis data")
+```
 
-# --- Analysis of the Q0 (Demand Intensity) Parameter ---
-cat("\n--- Posterior Summary for Contrasts on Q0 ---\n")
-posterior_q0_contrasts <- brms_fit |>
-  spread_draws(`b_b_.*`, regex = TRUE) |>
+## Subject-condition demand curves
+
+The ZBEn model is fitted independently to each rat, familiarity condition, and duration. `Q0` is predicted consumption at zero price; `alpha` is elasticity; essential value is `1 / (100 alpha)`. `Pmax` and `Omax` are approximated on the same 0.1-FR grid used by the archived analysis.
+
+```{r subject-curves}
+fit_curve <- function(curve_data) {
+  fit <- nlsLM(
+    lq ~ zben(fr, log_alpha, q0),
+    data = curve_data,
+    start = list(log_alpha = -6, q0 = 50),
+    lower = c(log_alpha = -Inf, q0 = .Machine$double.eps),
+    control = nls_control
+  )
+
+  residuals <- residuals(fit)
+  sse <- sum(residuals^2)
+  sst <- sum((curve_data$lq - mean(curve_data$lq))^2)
+  r_squared <- 1 - sse / sst
+
+  estimates <- coef(fit)
+  alpha <- exp(unname(estimates[["log_alpha"]]))
+  q0 <- unname(estimates[["q0"]])
+
+  price_grid <- seq(min(analysis_data$fr), max(analysis_data$fr), by = 0.1)
+  predicted_lq <- zben(price_grid, log(alpha), q0)
+  response_output <- inverse_ihs(predicted_lq) * price_grid
+  maximum_index <- which.max(response_output)
+
+  tibble(
+    alpha = alpha,
+    q0 = q0,
+    essential_value = essential_value(alpha),
+    pmax = price_grid[[maximum_index]],
+    omax = response_output[[maximum_index]],
+    r_squared = r_squared,
+    converged = isTRUE(fit$convInfo$isConv)
+  )
+}
+
+curve_keys <- analysis_data |>
+  distinct(rat, familiarity, duration) |>
+  arrange(rat, familiarity, duration)
+
+curve_results <- lapply(seq_len(nrow(curve_keys)), function(i) {
+  key <- curve_keys[i, ]
+  curve_data <- analysis_data |>
+    filter(
+      rat == key$rat,
+      familiarity == key$familiarity,
+      duration == key$duration
+    )
+
+  bind_cols(key, fit_curve(curve_data))
+}) |>
+  bind_rows()
+
+if (!all(curve_results$converged)) {
+  stop("At least one subject-condition demand curve did not converge.")
+}
+
+curve_results |>
+  mutate(across(c(alpha, q0, essential_value, pmax, omax, r_squared), ~ round(.x, 3))) |>
+  knitr::kable(caption = "Subject-condition ZBEn parameter estimates")
+
+curve_fit_summary <- curve_results |>
+  summarise(
+    curves = n(),
+    mean_r_squared = mean(r_squared),
+    minimum_r_squared = min(r_squared),
+    maximum_r_squared = max(r_squared)
+  )
+
+curve_fit_summary |>
+  mutate(across(where(is.numeric), ~ round(.x, 3))) |>
+  knitr::kable(caption = "Demand-curve fit summary")
+```
+
+## Published aggregate comparisons
+
+### Social familiarity
+
+The archived publication code collapsed across duration and fitted a four-parameter model. Its inner exponential used `q_cagemate * is_cagemate + q_non_cagemate` rather than the symmetric `q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate`. The compatibility model below retains that exact term because it reproduces the article's reported *p* values. The next section evaluates the symmetric correction.
+
+```{r familiarity-compatibility}
+familiarity_data <- analysis_data |>
+  group_by(rat, familiarity, fr) |>
+  summarise(lq = mean(lq), .groups = "drop") |>
   mutate(
-    familiarity_effect = (b_b_cagemate_10s + b_b_cagemate_30s + b_b_cagemate_60s) - 
-                         (b_b_non_cagemate_10s + b_b_non_cagemate_30s + b_b_non_cagemate_60s),
-    duration_linear_trend = ((-1)*b_b_cagemate_10s + 1*b_b_cagemate_60s) + 
-                            ((-1)*b_b_non_cagemate_10s + 1*b_b_non_cagemate_60s)
-  ) |>
-  select(familiarity_effect, duration_linear_trend) |>
-  pivot_longer(everything(), names_to = "contrast", values_to = "value") |>
-  group_by(contrast) |>
-  median_qi()
-  
-print(posterior_q0_contrasts)
+    is_cagemate = as.numeric(familiarity == "Cagemate"),
+    is_non_cagemate = as.numeric(familiarity == "Non-cagemate")
+  )
+
+familiarity_compatibility_fit <- nlsLM(
+  lq ~
+    ihs(q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate) *
+    exp(
+      (-exp(log_alpha_cagemate * is_cagemate + log_alpha_non_cagemate * is_non_cagemate) /
+        ihs(q_cagemate * is_cagemate + q_non_cagemate)) *
+      (q_cagemate * is_cagemate + q_non_cagemate) * fr
+    ),
+  data = familiarity_data,
+  start = list(
+    log_alpha_cagemate = -6,
+    log_alpha_non_cagemate = -6,
+    q_cagemate = 50,
+    q_non_cagemate = 50
+  ),
+  control = nls_control
+)
+
+normal_contrast <- function(fit, weights, label) {
+  estimates <- coef(fit)
+  weights <- weights[names(estimates)]
+  estimate <- sum(weights * estimates)
+  standard_error <- sqrt(drop(weights %*% vcov(fit) %*% weights))
+  z_value <- estimate / standard_error
+
+  tibble(
+    comparison = label,
+    estimate = estimate,
+    standard_error = standard_error,
+    z_value = z_value,
+    p_value = 2 * pnorm(-abs(z_value))
+  )
+}
+
+alpha_weights <- c(
+  log_alpha_cagemate = 1,
+  log_alpha_non_cagemate = -1,
+  q_cagemate = 0,
+  q_non_cagemate = 0
+)
+q0_weights <- c(
+  log_alpha_cagemate = 0,
+  log_alpha_non_cagemate = 0,
+  q_cagemate = 1,
+  q_non_cagemate = -1
+)
+
+familiarity_results <- bind_rows(
+  normal_contrast(familiarity_compatibility_fit, alpha_weights, "Elasticity (log alpha)"),
+  normal_contrast(familiarity_compatibility_fit, q0_weights, "Demand intensity (Q0)")
+)
+
+familiarity_results |>
+  mutate(across(where(is.numeric), ~ round(.x, 4))) |>
+  knitr::kable(caption = "Published familiarity compatibility tests")
+```
+
+### Interaction duration
+
+Duration is evaluated with nested nonlinear models. The full model estimates separate `alpha` and `Q0` values for 10, 30, and 60 seconds. Each reduced model constrains one parameter to be equal across durations.
+
+```{r duration-tests}
+duration_data <- analysis_data |>
+  group_by(rat, duration, fr) |>
+  summarise(lq = mean(lq), .groups = "drop") |>
+  mutate(
+    d10 = as.numeric(duration == "10 Sec"),
+    d30 = as.numeric(duration == "30 Sec"),
+    d60 = as.numeric(duration == "60 Sec")
+  )
+
+duration_full_fit <- nlsLM(
+  lq ~ ihs(q10 * d10 + q30 * d30 + q60 * d60) *
+    exp(
+      (-exp(a10 * d10 + a30 * d30 + a60 * d60) /
+        ihs(q10 * d10 + q30 * d30 + q60 * d60)) *
+      (q10 * d10 + q30 * d30 + q60 * d60) * fr
+    ),
+  data = duration_data,
+  start = list(a10 = -6, a30 = -6, a60 = -6, q10 = 50, q30 = 50, q60 = 50),
+  control = nls_control
+)
+
+duration_common_alpha_fit <- nlsLM(
+  lq ~ ihs(q10 * d10 + q30 * d30 + q60 * d60) *
+    exp(
+      (-exp(a) / ihs(q10 * d10 + q30 * d30 + q60 * d60)) *
+      (q10 * d10 + q30 * d30 + q60 * d60) * fr
+    ),
+  data = duration_data,
+  start = list(a = -6, q10 = 50, q30 = 50, q60 = 50),
+  control = nls_control
+)
+
+duration_common_q0_fit <- nlsLM(
+  lq ~ ihs(q0) *
+    exp(
+      (-exp(a10 * d10 + a30 * d30 + a60 * d60) / ihs(q0)) *
+      q0 * fr
+    ),
+  data = duration_data,
+  start = list(a10 = -6, a30 = -6, a60 = -6, q0 = 50),
+  control = nls_control
+)
+
+nested_f_test <- function(full_fit, reduced_fit, label) {
+  df_numerator <- df.residual(reduced_fit) - df.residual(full_fit)
+  df_denominator <- df.residual(full_fit)
+  sse_full <- deviance(full_fit)
+  sse_reduced <- deviance(reduced_fit)
+  f_value <- ((sse_reduced - sse_full) / df_numerator) /
+    (sse_full / df_denominator)
+
+  tibble(
+    comparison = label,
+    df_numerator = df_numerator,
+    df_denominator = df_denominator,
+    f_value = f_value,
+    p_value = pf(f_value, df_numerator, df_denominator, lower.tail = FALSE)
+  )
+}
+
+duration_results <- bind_rows(
+  nested_f_test(duration_full_fit, duration_common_alpha_fit, "Elasticity (alpha)"),
+  nested_f_test(duration_full_fit, duration_common_q0_fit, "Demand intensity (Q0)")
+)
+
+duration_results |>
+  mutate(across(where(is.numeric), ~ round(.x, 4))) |>
+  knitr::kable(caption = "Published duration tests")
+```
+
+## Symmetric familiarity sensitivity analysis
+
+This model changes only the asymmetric inner `Q0` expression identified above. It is a post-publication computational sensitivity check, not a replacement confirmatory analysis. Because familiarity was confounded with condition order and only four focal rats were studied, any difference from the compatibility model is evidence of specification sensitivity rather than a basis for a new substantive claim.
+
+```{r familiarity-sensitivity}
+familiarity_symmetric_fit <- nlsLM(
+  lq ~
+    ihs(q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate) *
+    exp(
+      (-exp(log_alpha_cagemate * is_cagemate + log_alpha_non_cagemate * is_non_cagemate) /
+        ihs(q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate)) *
+      (q_cagemate * is_cagemate + q_non_cagemate * is_non_cagemate) * fr
+    ),
+  data = familiarity_data,
+  start = list(
+    log_alpha_cagemate = -6,
+    log_alpha_non_cagemate = -6,
+    q_cagemate = 50,
+    q_non_cagemate = 50
+  ),
+  control = nls_control
+)
+
+familiarity_sensitivity_results <- bind_rows(
+  normal_contrast(familiarity_symmetric_fit, alpha_weights, "Elasticity (log alpha)"),
+  normal_contrast(familiarity_symmetric_fit, q0_weights, "Demand intensity (Q0)")
+)
+
+familiarity_sensitivity_results |>
+  mutate(across(where(is.numeric), ~ round(.x, 4))) |>
+  knitr::kable(caption = "Symmetric familiarity sensitivity tests")
+```
+
+## Reproducibility checks
+
+The checks below compare computed results with the rounded values reported in the article. A tolerance of .01 accommodates published rounding.
+
+```{r validation}
+computed_values <- c(
+  mean_r_squared = curve_fit_summary$mean_r_squared,
+  familiarity_alpha_p = familiarity_results$p_value[[1]],
+  familiarity_q0_p = familiarity_results$p_value[[2]],
+  duration_alpha_p = duration_results$p_value[[1]],
+  duration_q0_p = duration_results$p_value[[2]]
+)
+
+published_values <- c(
+  mean_r_squared = 0.91,
+  familiarity_alpha_p = 0.710,
+  familiarity_q0_p = 0.471,
+  duration_alpha_p = 0.226,
+  duration_q0_p = 0.805
+)
+
+validation_results <- tibble(
+  statistic = names(computed_values),
+  computed = unname(computed_values),
+  published = unname(published_values),
+  absolute_difference = abs(computed - published),
+  passes = absolute_difference <= 0.01
+)
+
+validation_results |>
+  mutate(across(c(computed, published, absolute_difference), ~ round(.x, 4))) |>
+  knitr::kable(caption = "Publication validation checks")
+
+if (!all(validation_results$passes)) {
+  stop("At least one computed result differs materially from the published value.")
+}
+```
+
+## Interpretation
+
+The analyses reproduce the article's central findings: demand for social interaction decreased with FR price and the ZBEn model described the 24 demand curves well. In the publication-compatible models, neither social familiarity nor interaction duration systematically changed `Q0` or `alpha`. The symmetric sensitivity model demonstrates that the familiarity elasticity result depends on the exact aggregate equation; this dependence should be reported transparently and interpreted cautiously rather than used to overstate evidence from a small, order-confounded design.
+
+## Session information
+
+```{r session-information}
+sessionInfo()
 ```

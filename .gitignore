@@ -1,49 +1,111 @@
-# History files
+# Operating systems and editors
+.DS_Store
+._*
+Thumbs.db
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+.Renviron
+*.pem
+*.key
+
+# R and RStudio
 .Rhistory
 .Rapp.history
-
-# Session Data files
 .RData
 .RDataTmp
-
-# User-specific files
 .Ruserdata
-
-# Example code in package build process
-*-Ex.R
-
-# Output files from R CMD build
+.Rproj.user/
+renv/library/
+renv/local/
+renv/python/
+renv/staging/
+packrat/
+*.Rcheck/
 /*.tar.gz
 
-# Output files from R CMD check
-/*.Rcheck/
+# Python and Jupyter
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
 
-# RStudio files
-.Rproj.user/
-
-# produced vignettes
-vignettes/*.html
-vignettes/*.pdf
-
-# OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
-.httr-oauth
-
-# knitr and R markdown default cache directories
+# Quarto, knitr, and generated analysis outputs
+.quarto/
 *_cache/
-/cache/
-
-# Temporary files created by R markdown
+*_files/
 *.utf8.md
 *.knit.md
+/Analysis/*.html
+/Analysis/*.pdf
+/Analysis/output/
+/output/
+/results/
+/tmp/
+/Code/figure/
+/Code/table/
 
-# R Environment Variables
-.Renviron
+# Research data: obtain the public data from OSF
+/data/
+/Data/
+/raw_data/
+/raw-data/
+/private_data/
+/private-data/
+/Analysis/Table1.csv
+/Code/dat.csv
+*.sav
+*.por
+*.sas7bdat
+*.dta
 
-# pkgdown site
-docs/
+# Private drafts and correspondence
+/Manuscript/
+/manuscript/
+/Drafts/
+/drafts/
+/Private/
+/private/
+/Correspondence/
+/correspondence/
+*response-to-reviewers*
+*response to reviewers*
 
-# translation temp files
-po/*~
+# Survey exports and Qualtrics materials
+/Qualtrics/
+/qualtrics/
+*Qualtrics*
+*_qualtrics.*
+*.qsf
 
-# RStudio Connect folder
-rsconnect/
+# Literature libraries and downloaded articles
+/Literature/
+/literature/
+/References/
+/references/
+*.enl
+*.ris
+*.nbib
+*.bib.bak
+
+# Administrative and financial records
+/Receipts/
+/receipts/
+/Invoices/
+/invoices/
+
+# Local publication and legacy-analysis archive
+/Code/
+/fpsyg-14-1158365.pdf

@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "Please cite the published article and this software repository."
+title: "Reproducible analyses for social familiarity and reinforcement value"
+type: software
+authors:
+  - family-names: Wan
+    given-names: Haoran
+repository-code: "https://github.com/haoranmattwan/demand-analysis-social-familiarity-2023"
+url: "https://doi.org/10.3389/fpsyg.2023.1158365"
+license: MIT
+version: 1.0.0
+date-released: 2026-07-02
+keywords:
+  - behavioral economics
+  - demand analysis
+  - social reinforcement
+  - zero-bounded exponential model
+  - reproducible research
+preferred-citation:
+  type: article
+  title: "Social familiarity and reinforcement value: A behavioral-economic analysis of demand for social interaction with cagemate and non-cagemate female rats"
+  authors:
+    - family-names: Schulingkamp
+      given-names: Rachel
+    - family-names: Wan
+      given-names: Haoran
+    - family-names: Hackenberg
+      given-names: Timothy D.
+  journal: Frontiers in Psychology
+  volume: 14
+  year: 2023
+  doi: "10.3389/fpsyg.2023.1158365"
