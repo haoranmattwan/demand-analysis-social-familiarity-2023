@@ -11,13 +11,13 @@ Four focal rats completed fixed-ratio schedules for 10-, 30-, and 60-second acce
 
 ## Data availability
 
-Data are distributed separately through the Open Science Framework (OSF) and are intentionally not tracked in this repository. [Find the study data on OSF by the exact article title](https://osf.io/search/?q=%22Social%20familiarity%20and%20reinforcement%20value%22), download the analysis-ready CSV, and save it as `Analysis/Table1.csv`.
+The source data are available from the article website's [supplementary material](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2023.1158365/full#supplementary-material) and are intentionally not tracked in this repository. Download the supplementary data and save the analysis table as `Analysis/Table1.csv`.
 
-If the downloaded file has another location or name, set `SOCIAL_DEMAND_DATA` to its path before running an analysis. The publisher's [supplementary materials](https://doi.org/10.3389/fpsyg.2023.1158365) provide an additional data source. No data are bundled with releases from this repository.
+The analysis table must contain `Rat`, `Social Familiarity`, `Social Duration`, `Social FR`, and `Interaction Rate`. If the file has another location or name, set `SOCIAL_DEMAND_DATA` to its path before running an analysis. No data are bundled with releases from this repository.
 
 ## Reproduce the analyses
 
-Clone the repository, download the data from OSF, and run either workflow from the repository root.
+Clone the repository, download the data from the article's supplementary material, and run either workflow from the repository root.
 
 ### R
 
@@ -82,7 +82,7 @@ The analysis uses the ZBEn model of Gilroy et al. (2021). It estimates demand in
 
 - Analysis code is licensed under the [MIT License](LICENSE).
 - The published article is open access under CC BY 4.0; its copyright remains with the article authors.
-- Data should be cited using the metadata on the OSF record.
+- Cite the article when reusing its supplementary data.
 - Generated reports, caches, local environments, private research materials, and data are excluded from version control.
 - Please cite the article and this repository when reusing the workflow. Machine-readable citation metadata are provided in `CITATION.cff`.
 

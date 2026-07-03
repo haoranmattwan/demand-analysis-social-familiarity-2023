@@ -58,7 +58,7 @@ __pycache__/
 /Code/figure/
 /Code/table/
 
-# Research data: obtain the public data from OSF
+# Research data: obtain the source data from the article supplementary material
 /data/
 /Data/
 /raw_data/

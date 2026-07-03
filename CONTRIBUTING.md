@@ -4,7 +4,7 @@ Contributions should improve the accuracy, transparency, or portability of the p
 
 ## Before opening a pull request
 
-1. Obtain the analysis data from OSF; do not commit data files or private research materials.
+1. Obtain the source data from the article's [supplementary material](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2023.1158365/full#supplementary-material); do not commit data files or private research materials.
 2. Make the same substantive change in the R and Python workflows when applicable.
 3. Run the validation checks in both workflows.
 4. Explain any change to the model specification and report its effect on the results.

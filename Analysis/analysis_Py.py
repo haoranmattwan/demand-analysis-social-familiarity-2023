@@ -4,9 +4,9 @@ Run from the repository root:
 
     python Analysis/analysis_Py.py
 
-The analysis data are distributed through OSF and are not tracked here. By
-default, this script looks for Analysis/Table1.csv. Set SOCIAL_DEMAND_DATA or
-pass --data to use another location.
+The source data are available from the article supplementary material and are
+not tracked here. By default, this script looks for Analysis/Table1.csv. Set
+SOCIAL_DEMAND_DATA or pass --data to use another location.
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data",
         type=Path,
-        help="Path to the OSF analysis-ready CSV (default: Analysis/Table1.csv).",
+        help="Path to the article supplementary-data CSV (default: Analysis/Table1.csv).",
     )
     parser.add_argument(
         "--output-dir",
@@ -106,7 +106,8 @@ def resolve_data_path(explicit_path: Path | None) -> Path:
             return candidate.resolve()
 
     raise FileNotFoundError(
-        "Data not found. Download Table1.csv from OSF and place it in Analysis/, "
+        "Data not found. Obtain Table1.csv from the article supplementary material "
+        "and place it in Analysis/, "
         "set SOCIAL_DEMAND_DATA, or pass --data."
     )
 

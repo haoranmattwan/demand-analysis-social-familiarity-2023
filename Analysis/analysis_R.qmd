@@ -23,7 +23,7 @@ This report reproduces the nonlinear demand analyses reported by Schulingkamp, W
 
 The workflow follows the published analysis: fit 24 subject-condition zero-bounded exponential (ZBEn) demand curves, summarize model fit and derived demand parameters, compare familiarity with aggregate contrasts, and compare duration with nested nonlinear models. Exploratory models are outside the scope of this publication replication.
 
-> **Data access.** Download the analysis-ready data from the [OSF record found by the exact article title](https://osf.io/search/?q=%22Social%20familiarity%20and%20reinforcement%20value%22) and save it as `Analysis/Table1.csv`. Alternatively, set the `SOCIAL_DEMAND_DATA` environment variable to the downloaded file.
+> **Data access.** Download the source data from the article's [supplementary material](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2023.1158365/full#supplementary-material) and save the analysis table as `Analysis/Table1.csv`. Alternatively, set the `SOCIAL_DEMAND_DATA` environment variable to the file.
 
 ## Setup
 
@@ -70,7 +70,7 @@ nls_control <- nls.lm.control(maxiter = 1024, maxfev = 100000)
 
 ## Data import and validation
 
-The OSF file is kept outside version control. The loader checks an explicit environment variable first and then the two paths expected when rendering from the repository root or the `Analysis` directory.
+The supplementary data file is kept outside version control. The loader checks an explicit environment variable first and then the two paths expected when rendering from the repository root or the `Analysis` directory.
 
 ```{r data-import}
 data_candidates <- unique(c(
@@ -83,7 +83,7 @@ existing_data <- data_candidates[file.exists(data_candidates)]
 
 if (length(existing_data) == 0L) {
   stop(
-    "Data not found. Download Table1.csv from OSF and place it in Analysis/, ",
+    "Data not found. Obtain Table1.csv from the article supplementary material and place it in Analysis/, ",
     "or set SOCIAL_DEMAND_DATA to the downloaded file."
   )
 }
